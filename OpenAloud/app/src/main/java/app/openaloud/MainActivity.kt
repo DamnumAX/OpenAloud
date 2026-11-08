@@ -45,6 +45,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var list: RecyclerView
     private lateinit var seek: SeekBar
     private lateinit var playBtn: Button
+    private lateinit var controlBar: ViewGroup
+    private lateinit var expandControls: Button
     private val adapter = SentenceAdapter()
     private var shownDoc: String? = null
     private var shownIndex = 0
@@ -144,7 +146,8 @@ class MainActivity : AppCompatActivity() {
                     lastTapAt = now
                     lastTapPosition = position
                     if (position == RecyclerView.NO_POSITION) {
-                        if (event.x < rv.width * 0.3f) pageBy(-1)
+                        if (event.x in (rv.width * 0.35f)..(rv.width * 0.65f)) setControlsExpanded(!controlsExpanded)
+                        else if (event.x < rv.width * 0.3f) pageBy(-1)
                         else if (event.x > rv.width * 0.7f) pageBy(1)
                     }
                     false
@@ -154,6 +157,16 @@ class MainActivity : AppCompatActivity() {
         applyReaderBackground()
         seek = findViewById(R.id.seek)
         playBtn = findViewById(R.id.play)
+        controlBar = findViewById(R.id.controlBar)
+        expandControls = findViewById(R.id.expandControls)
+        var controlsExpanded = true
+        fun setControlsExpanded(expanded: Boolean) {
+            controlsExpanded = expanded
+            controlBar.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+            seek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+            expandControls.text = if (expanded) "⌄" else "⌃"
+        }
+        expandControls.setOnClickListener { setControlsExpanded(!controlsExpanded) }
 
         playBtn.setOnClickListener {
             if (Reader.sentences.isEmpty()) toast("Сначала откройте файл (меню ⋮)")
