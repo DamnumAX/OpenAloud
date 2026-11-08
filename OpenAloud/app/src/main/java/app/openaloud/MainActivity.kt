@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.BitmapFactory
 import android.view.ViewGroup
@@ -51,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     private var voicePickerTts: TextToSpeech? = null
     private var lastTapAt = 0L
     private var lastTapPosition = RecyclerView.NO_POSITION
+    private var touchStartX = 0f
+    private var touchStartY = 0f
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -122,7 +125,13 @@ class MainActivity : AppCompatActivity() {
         })
         list.setOnTouchListener { rv, event ->
             scaleDetector.onTouchEvent(event)
-            if (event.action == MotionEvent.ACTION_UP) {
+            if (event.action == MotionEvent.ACTION_DOWN) { touchStartX = event.x; touchStartY = event.y; false }
+            else if (event.action == MotionEvent.ACTION_UP) {
+                if (kotlin.math.abs(event.x - touchStartX) > 90 && kotlin.math.abs(event.x - touchStartX) > kotlin.math.abs(event.y - touchStartY)) {
+                    pageBy(if (event.x < touchStartX) 1 else -1)
+                    lastTapAt = 0L
+                    return@setOnTouchListener true
+                }
                 val now = android.os.SystemClock.uptimeMillis()
                 val child = rv.findChildViewUnder(event.x, event.y)
                 val position = if (child == null) RecyclerView.NO_POSITION else rv.getChildAdapterPosition(child)
