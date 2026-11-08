@@ -112,6 +112,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reader_landscape", false)) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         toolbar = findViewById(R.id.toolbar)
+        toolbar.setTitleTextAppearance(this, R.style.ReaderToolbarTitle)
+        toolbar.setSubtitleTextAppearance(this, R.style.ReaderToolbarSubtitle)
         setSupportActionBar(toolbar)
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
