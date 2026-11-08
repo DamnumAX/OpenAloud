@@ -58,6 +58,6 @@
         <Button android:id="@+id/nextCh" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#51433B" android:textColor="#FFFFFF"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="+ глава" android:textSize="12sp" />
-        <View android:id="@+id/bottomFrame" android:layout_width="match_parent" android:layout_height="2dp" android:background="#51433B" />
-</LinearLayout>
+    </LinearLayout>
+    <View android:id="@+id/bottomFrame" android:layout_width="match_parent" android:layout_height="2dp" android:background="#51433B" />
 </LinearLayout>
