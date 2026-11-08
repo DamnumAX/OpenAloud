@@ -1,3 +1,32 @@
 <resources>
     <style name="Theme.OpenAloud" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <style name="Theme.OpenAloud.Gold" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">#8A5A00</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#B8860B</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="android:colorBackground">#FFF8E7</item>
+        <item name="colorSurface">#FFF3D0</item>
+        <item name="colorOnSurface">#3B2A10</item>
+        <item name="colorSurfaceVariant">#F0E1BE</item>
+        <item name="colorOnSurfaceVariant">#594629</item>
+        <item name="android:statusBarColor">#6B4300</item>
+        <item name="android:navigationBarColor">#FFF3D0</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+    <style name="Theme.OpenAloud.Brown" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#C08A55</item>
+        <item name="colorOnPrimary">#20150E</item>
+        <item name="colorSecondary">#D2A679</item>
+        <item name="colorOnSecondary">#24180F</item>
+        <item name="android:colorBackground">#241A14</item>
+        <item name="colorSurface">#30231B</item>
+        <item name="colorOnSurface">#F1E2D0</item>
+        <item name="colorSurfaceVariant">#49372B</item>
+        <item name="colorOnSurfaceVariant">#D8C2AC</item>
+        <item name="android:statusBarColor">#1B120D</item>
+        <item name="android:navigationBarColor">#241A14</item>
+    </style>
 </resources>
