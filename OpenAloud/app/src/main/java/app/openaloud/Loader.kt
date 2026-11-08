@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.core.text.HtmlCompat
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
@@ -26,11 +29,19 @@ object Loader {
 
     fun fromUri(ctx: Context, uri: Uri): Doc {
         val name = displayName(ctx, uri)
-        val isEpub = name.endsWith(".epub", true) ||
-            ctx.contentResolver.getType(uri) == "application/epub+zip"
-        val parts = if (isEpub) epub(ctx, uri) else {
-            val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
-            listOf(decode(bytes))
+        val mime = ctx.contentResolver.getType(uri).orEmpty()
+        val isEpub = name.endsWith(".epub", true) || mime == "application/epub+zip"
+        val isPdf = name.endsWith(".pdf", true) || mime == "application/pdf"
+        val isDocx = name.endsWith(".docx", true) ||
+            mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        val parts = when {
+            isEpub -> epub(ctx, uri)
+            isPdf -> listOf(pdf(ctx, uri))
+            isDocx -> listOf(docx(ctx, uri))
+            else -> {
+                val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                listOf(decode(bytes))
+            }
         }
         return build(uri.toString(), name.substringBeforeLast('.'), parts)
     }
@@ -129,6 +140,38 @@ object Loader {
             }
         }
         return parts.joinToString("/")
+    }
+
+    private fun pdf(ctx: Context, uri: Uri): String {
+        PDFBoxResourceLoader.init(ctx)
+        ctx.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Не удалось открыть PDF" }
+            PDDocument.load(input).use { document ->
+                require(!document.isEncrypted) { "PDF защищён паролем и пока не поддерживается" }
+                return PDFTextStripper().getText(document)
+            }
+        }
+    }
+
+    private fun docx(ctx: Context, uri: Uri): String {
+        var documentXml: String? = null
+        ZipInputStream(ctx.contentResolver.openInputStream(uri)?.buffered()
+            ?: error("Не удалось открыть DOCX")).use { zip ->
+            var entry = zip.nextEntry
+            while (entry != null) {
+                if (entry.name == "word/document.xml") {
+                    documentXml = decode(zip.readBytes())
+                    break
+                }
+                entry = zip.nextEntry
+            }
+        }
+        val xml = documentXml ?: error("В DOCX не найден основной текст")
+        val text = xml.replace(Regex("(?i)</w:p\\s*>"), "\\n")
+            .replace(Regex("(?i)<w:tab\\b[^>]*/>"), "\\t")
+            .replace(Regex("(?is)<[^>]+>"), "")
+        return HtmlCompat.fromHtml(text, HtmlCompat.FROM_HTML_MODE_LEGACY)
+            .toString().replace("\\u00A0", " ").trim()
     }
 
     private fun epub(ctx: Context, uri: Uri): List<String> {
