@@ -192,6 +192,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 4, 3, "Таймер сна")
         menu.add(0, 5, 4, "Словарь замен")
         menu.add(0, 6, 5, "Голос и движок (системные)")
+        menu.add(0, 7, 6, "Пауза между предложениями")
         return true
     }
 
@@ -207,6 +208,7 @@ class MainActivity : AppCompatActivity() {
             } catch (_: Exception) {
                 startActivity(Intent(Settings.ACTION_SETTINGS))
             }
+            7 -> sentencePauseDialog()
         }
         return true
     }
@@ -249,6 +251,20 @@ class MainActivity : AppCompatActivity() {
             { "%.1f".format(0.5f + it / 10f) }) { Prefs.setPitch(this, 0.5f + it / 10f) }
         AlertDialog.Builder(this).setTitle("Скорость и тон").setView(box)
             .setPositiveButton("OK", null).show()
+    }
+
+    private fun sentencePauseDialog() {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        val current = Prefs.sentencePause(this)
+        sliderRow(box, "Пауза", 30, current / 100,
+            { if (it == 0) "Без паузы" else "${it * 100} мс" }
+        ) { Prefs.setSentencePause(this, it * 100) }
+        AlertDialog.Builder(this).setTitle("Интервал между предложениями")
+            .setMessage("Небольшая пауза делает озвучку естественнее.")
+            .setView(box).setPositiveButton("Готово", null).show()
     }
 
     private fun sleepDialog() {
