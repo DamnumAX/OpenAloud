@@ -13,6 +13,11 @@ import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.GestureDetector
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.BackgroundColorSpan
+import android.util.TypedValue
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.BitmapFactory
 import android.view.View
@@ -298,11 +303,13 @@ class MainActivity : AppCompatActivity() {
         val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
         if (bookMode) {
             buildBookPages()
+            list.setBackgroundColor(readerSurfaceColor())
             list.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
             if (pagerSnapHelper == null) {
                 pagerSnapHelper = PagerSnapHelper().also { it.attachToRecyclerView(list) }
             }
         } else {
+            list.background = null
             pagerSnapHelper?.attachToRecyclerView(null)
             pagerSnapHelper = null
             list.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
@@ -346,6 +353,12 @@ class MainActivity : AppCompatActivity() {
         val current = lm.findFirstVisibleItemPosition().coerceAtLeast(0)
         val target = (current + direction).coerceIn(0, (adapter.itemCount - 1).coerceAtLeast(0))
         list.smoothScrollToPosition(target)
+    }
+
+    private fun readerSurfaceColor(): Int {
+        val value = TypedValue()
+        theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, value, true)
+        return if (value.resourceId != 0) androidx.core.content.ContextCompat.getColor(this, value.resourceId) else value.data
     }
 
     private fun applyReaderBackground() {
@@ -957,7 +970,22 @@ class MainActivity : AppCompatActivity() {
         override fun onBindViewHolder(h: VH, pos: Int) {
             val book = isBookMode()
             val indices = if (book) bookPages.getOrNull(pos).orEmpty() else listOf(pos)
-            h.tv.text = indices.joinToString("\n\n") { Reader.sentences.getOrElse(it) { "" } }
+            val parts = indices.map { Reader.sentences.getOrElse(it) { "" } }
+            val plainText = parts.joinToString("\n\n")
+            val starts = ArrayList<Int>()
+            var cursor = 0
+            parts.forEachIndexed { i, part ->
+                starts.add(cursor)
+                cursor += part.length + if (i < parts.lastIndex) 2 else 0
+            }
+            val styled = SpannableString(plainText)
+            val activePart = indices.indexOf(Reader.index)
+            if (activePart >= 0) {
+                val start = starts[activePart]
+                val end = start + parts[activePart].length
+                styled.setSpan(BackgroundColorSpan(0x66FFC107), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            }
+            h.tv.text = styled
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
             val density = resources.displayMetrics.density
             val pad = (Prefs.sidePadding(this@MainActivity) * density).roundToInt()
@@ -969,20 +997,21 @@ class MainActivity : AppCompatActivity() {
             h.tv.setPadding(pad, verticalPad, pad, verticalPad)
             h.tv.setTextIsSelectable(false)
             h.tv.gravity = if (book) android.view.Gravity.CENTER_VERTICAL else android.view.Gravity.TOP
-            h.tv.setBackgroundColor(if (Reader.index in indices) 0x22FFC107 else Color.TRANSPARENT)
-            h.tv.setOnClickListener {
-                val now = System.currentTimeMillis()
-                val same = if (book) lastPageTap == pos else lastPageTap == indices.firstOrNull()
-                if (same && now - lastPageTapAt < 450) {
-                    val target = if (book) indices.firstOrNull() ?: 0 else pos
+            h.tv.setBackgroundColor(if (book) readerSurfaceColor() else Color.TRANSPARENT)
+            val detector = GestureDetector(this@MainActivity, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onDown(e: MotionEvent): Boolean = true
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    val layout = h.tv.layout ?: return true
+                    val line = layout.getLineForVertical((e.y - h.tv.totalPaddingTop).toInt().coerceAtLeast(0))
+                    val offset = layout.getOffsetForHorizontal(line, (e.x - h.tv.totalPaddingLeft).coerceAtLeast(0f))
+                        .coerceIn(0, plainText.length)
+                    val part = starts.indexOfLast { it <= offset }.coerceAtLeast(0)
+                    val target = indices.getOrElse(part) { indices.firstOrNull() ?: 0 }
                     cmd(TtsService.SEEK_PLAY, target)
-                    lastPageTapAt = 0L
-                    toast("Озвучивание начато с выбранного места")
-                } else {
-                    lastPageTapAt = now
-                    lastPageTap = if (book) pos else indices.firstOrNull() ?: pos
+                    return true
                 }
-            }
+            })
+            h.tv.setOnTouchListener { _, event -> detector.onTouchEvent(event) }
         }
     }
 }
