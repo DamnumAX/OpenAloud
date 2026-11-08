@@ -363,7 +363,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyReaderBackground() {
         val raw = getSharedPreferences("p", MODE_PRIVATE).getString("reader_bg_uri", null)
-        if (raw.isNullOrEmpty()) { list.background = null; return }
+        if (raw.isNullOrEmpty()) {
+            list.background = if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false))
+                android.graphics.drawable.ColorDrawable(readerSurfaceColor()) else null
+            return
+        }
         try { contentResolver.openInputStream(Uri.parse(raw))?.use { stream -> BitmapFactory.decodeStream(stream)?.let { list.background = BitmapDrawable(resources, it) } } } catch (_: Exception) { toast("Не удалось загрузить фон") }
     }
 
