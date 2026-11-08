@@ -186,7 +186,7 @@ class MainActivity : AppCompatActivity() {
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, "Открыть файл (TXT, EPUB)")
+        menu.add(0, 1, 0, "Открыть файл (TXT, EPUB, PDF, DOCX)")
         menu.add(0, 2, 1, "Вставить из буфера / ссылку")
         menu.add(0, 3, 2, "Скорость и тон")
         menu.add(0, 4, 3, "Таймер сна")
