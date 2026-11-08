@@ -12,6 +12,7 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.support.v4.media.MediaMetadataCompat
@@ -49,6 +50,8 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
     private val main = Handler(Looper.getMainLooper())
     private lateinit var session: MediaSessionCompat
     private var focus: AudioFocusRequest? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+    private val sentenceTask = Runnable { if (wantPlay) speakCurrent() }
     private val sleepTask = Runnable { pause() }
 
     override fun onBind(i: Intent?): IBinder? = null
@@ -88,8 +91,10 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
                     if (wantPlay && id == "s${Reader.index}") {
                         Reader.index++
                         save()
-                        speakCurrent()
                         refreshUi(true)
+                        main.removeCallbacks(sentenceTask)
+                        val delay = Prefs.sentencePause(this@TtsService)
+                        if (delay == 0) speakCurrent() else main.postDelayed(sentenceTask, delay.toLong())
                     }
                 }
             }
@@ -131,6 +136,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         if (!wantPlay) { stopForeground(STOP_FOREGROUND_REMOVE); notified = false; return }
         Reader.playing = true
         requestFocus()
+        acquireWakeLock()
         if (Reader.index >= Reader.sentences.size) Reader.index = 0
         speakCurrent()
         refreshUi(true)
@@ -139,7 +145,9 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
     private fun pause() {
         wantPlay = false
         Reader.playing = false
+        main.removeCallbacks(sentenceTask)
         tts?.stop()
+        wakeLock?.takeIf { it.isHeld }?.release()
         focus?.let { getSystemService(AudioManager::class.java).abandonAudioFocusRequest(it) }
         focus = null
         save()
@@ -148,6 +156,7 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun seek(i: Int) {
+        main.removeCallbacks(sentenceTask)
         Reader.index = i.coerceIn(0, max(0, Reader.sentences.size - 1))
         save()
         if (wantPlay) speakCurrent()
@@ -195,6 +204,14 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             r = r.replace(line.substring(0, i).trim(), line.substring(i + 1).trim(), ignoreCase = true)
         }
         return r
+    }
+
+    @Suppress("WakelockTimeout")
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "OpenAloud:Speech")
+            .apply { setReferenceCounted(false); acquire() }
     }
 
     private fun requestFocus() {
@@ -267,6 +284,8 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         main.removeCallbacks(sleepTask)
+        main.removeCallbacks(sentenceTask)
+        wakeLock?.takeIf { it.isHeld }?.release()
         tts?.shutdown()
         session.release()
         super.onDestroy()
