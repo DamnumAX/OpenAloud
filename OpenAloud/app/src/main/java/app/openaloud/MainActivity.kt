@@ -46,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     private var shownDoc: String? = null
     private var shownIndex = 0
     private var seeking = false
+    private var voicePickerTts: TextToSpeech? = null
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -150,6 +151,12 @@ class MainActivity : AppCompatActivity() {
         if (Reader.docId.isNotEmpty()) Prefs.setPos(this, Reader.docId, Reader.index)
         Reader.onChange = null
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        voicePickerTts?.shutdown()
+        voicePickerTts = null
+        super.onDestroy()
     }
 
     // ---------- открытие текста ----------
@@ -425,17 +432,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun voiceDialog() {
         toast("Загружаю список голосов…")
-        lateinit var engine: TextToSpeech
-        engine = TextToSpeech(this) { status ->
+        val engine = TextToSpeech(this) { status ->
+            val activeEngine = voicePickerTts ?: return@TextToSpeech
             if (status != TextToSpeech.SUCCESS) {
                 runOnUiThread { toast("Не удалось загрузить голоса") }
                 return@TextToSpeech
             }
-            val voices = engine.voices?.sortedBy { it.name } ?: emptyList()
+            val voices = activeEngine.voices?.sortedBy { it.name } ?: emptyList()
             runOnUiThread {
                 if (voices.isEmpty()) {
                     toast("Системные голоса не найдены")
-                    engine.shutdown()
+                    activeEngine.shutdown()
+                    voicePickerTts = null
                     return@runOnUiThread
                 }
                 val labels = voices.map { it.name + " · " + it.locale.displayName }.toTypedArray()
@@ -443,7 +451,8 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.Builder(this).setTitle("Голос чтения")
                     .setSingleChoiceItems(labels, selected) { dialog, which ->
                         Prefs.setVoice(this, voices[which].name)
-                        engine.shutdown()
+                        activeEngine.shutdown()
+                        voicePickerTts = null
                         dialog.dismiss()
                         toast("Голос выбран. Изменение применится при следующей фразе.")
                     }
@@ -455,6 +464,7 @@ class MainActivity : AppCompatActivity() {
                     .setOnCancelListener { engine.shutdown() }.show()
             }
         }
+        voicePickerTts = engine
     }
 
     private fun searchDialog() {
