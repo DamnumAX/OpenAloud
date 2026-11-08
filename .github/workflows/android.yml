@@ -6,6 +6,7 @@ on:
     paths:
       - 'OpenAloud.zip'
       - '.github/workflows/android.yml'
+      - 'OpenAloud/**'
   workflow_dispatch:
 
 permissions:
@@ -27,7 +28,7 @@ jobs:
       - name: Extract source archive
         run: |
           test -f OpenAloud.zip
-          unzip -q OpenAloud.zip -d .
+          if [ ! -f OpenAloud/app/build.gradle.kts ]; then unzip -q OpenAloud.zip -d .; fi
           test -f OpenAloud/app/build.gradle.kts
 
       - name: Commit extracted Android source
