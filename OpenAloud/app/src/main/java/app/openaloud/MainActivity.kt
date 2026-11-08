@@ -299,7 +299,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Управление книгами")
             .setItems(books.map { it.optString("title") }.toTypedArray()) { _, which ->
                 val b = books[which]
-                val edit = EditText(this).setText(b.optString("title"))
+                val edit = EditText(this).apply { setText(b.optString("title")) }
                 AlertDialog.Builder(this).setTitle("Название книги").setView(edit)
                     .setPositiveButton("Сохранить") { _, _ ->
                         b.put("title", edit.text.toString().trim())
@@ -338,7 +338,7 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.Builder(this).setItems(names) { _, index ->
                     val old = names[index]
                     if (action == 1) {
-                        val edit = EditText(this).setText(old)
+                        val edit = EditText(this).apply { setText(old) }
                         AlertDialog.Builder(this).setTitle("Новое название").setView(edit)
                             .setPositiveButton("Сохранить") { _, _ ->
                                 val n = edit.text.toString().trim()
