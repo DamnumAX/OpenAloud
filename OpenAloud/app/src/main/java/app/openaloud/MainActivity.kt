@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.BitmapFactory
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.CheckBox
@@ -49,9 +51,11 @@ class MainActivity : AppCompatActivity() {
     private var voicePickerTts: TextToSpeech? = null
 
 
-    private val importBook = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) Thread {
+    private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) Thread {
+            var imported = 0
             try {
+                uris.forEach { uri ->
                 val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
                     if (it.moveToFirst()) it.getString(0) else null
                 } ?: "Книга"
@@ -61,15 +65,22 @@ class MainActivity : AppCompatActivity() {
                 var n = 1
                 while (target.exists()) { target = File(dir, n++.toString() + "_" + safe) }
                 contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
-                runOnUiThread {
-                    val a = Prefs.library(this)
-                    a.put(JSONObject().put("path", target.absolutePath).put("title", name).put("folder", ""))
-                    Prefs.saveLibrary(this, a)
-                    toast("Книга сохранена в библиотеке")
-                    libraryDialog()
+                val a = Prefs.library(this)
+                a.put(JSONObject().put("path", target.absolutePath).put("title", name).put("folder", ""))
+                Prefs.saveLibrary(this, a)
+                imported++
                 }
+                runOnUiThread { toast("Добавлено книг: " + imported); libraryDialog() }
             } catch (e: Exception) { runOnUiThread { toast("Ошибка импорта: " + e.message) } }
         }.start()
+    }
+
+    private val chooseBackground = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) try {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            getSharedPreferences("p", MODE_PRIVATE).edit().putString("reader_bg_uri", uri.toString()).apply()
+            applyReaderBackground()
+        } catch (e: Exception) { toast("Не удалось установить фон: " + e.message) }
     }
 
     private val openDoc = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -108,6 +119,7 @@ class MainActivity : AppCompatActivity() {
             }
         })
         list.setOnTouchListener { _, event -> scaleDetector.onTouchEvent(event); false }
+        applyReaderBackground()
         seek = findViewById(R.id.seek)
         playBtn = findViewById(R.id.play)
 
@@ -216,6 +228,12 @@ class MainActivity : AppCompatActivity() {
 
     // ---------- интерфейс ----------
 
+    private fun applyReaderBackground() {
+        val raw = getSharedPreferences("p", MODE_PRIVATE).getString("reader_bg_uri", null)
+        if (raw.isNullOrEmpty()) { list.background = null; return }
+        try { contentResolver.openInputStream(Uri.parse(raw))?.use { stream -> BitmapFactory.decodeStream(stream)?.let { list.background = BitmapDrawable(resources, it) } } } catch (_: Exception) { toast("Не удалось загрузить фон") }
+    }
+
     private fun refresh() {
         val lm = list.layoutManager as LinearLayoutManager
         if (shownDoc != Reader.docId) {
@@ -263,6 +281,8 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 14, 13, "Выбрать голос")
         menu.add(0, 15, 14, "Поиск по тексту")
         menu.add(0, 16, 15, "Отступы текста")
+        menu.add(0, 17, 16, "Установить свой фон")
+        menu.add(0, 18, 17, "Убрать свой фон")
         return true
     }
 
@@ -288,6 +308,8 @@ class MainActivity : AppCompatActivity() {
             14 -> voiceDialog()
             15 -> searchDialog()
             16 -> textLayoutDialog()
+            17 -> chooseBackground.launch(arrayOf("image/*"))
+            18 -> { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
         }
         return true
     }
@@ -710,12 +732,9 @@ class MainActivity : AppCompatActivity() {
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
             val pad = (Prefs.sidePadding(this@MainActivity) * resources.displayMetrics.density).roundToInt()
             h.tv.setPadding(pad, (6 * resources.displayMetrics.density).roundToInt(), pad, (6 * resources.displayMetrics.density).roundToInt())
-            h.tv.setTextIsSelectable(true)
+            h.tv.setTextIsSelectable(false)
             h.tv.setBackgroundColor(if (pos == Reader.index) 0x66FFC107 else Color.TRANSPARENT)
-            h.tv.setOnClickListener {
-                val p = h.bindingAdapterPosition
-                if (p >= 0) cmd(TtsService.SEEK_PLAY, p)
-            }
+            h.tv.setOnClickListener { /* позицию чтения меняет отдельное действие */ }
         }
     }
 }
