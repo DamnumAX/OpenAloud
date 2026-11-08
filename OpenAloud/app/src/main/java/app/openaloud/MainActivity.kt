@@ -395,11 +395,15 @@ class MainActivity : AppCompatActivity() {
         if (shownDoc != Reader.docId) {
             shownDoc = Reader.docId
             adapter.notifyDataSetChanged()
-            if (bookMode) list.scrollToPosition(bookPages.indexOfFirst { Reader.index in it }.coerceAtLeast(0))
-            else lm.scrollToPositionWithOffset(Reader.index, 200)
+            if (bookMode) {
+                val page = bookPages.indexOfFirst { pageItems -> Reader.index in pageItems }.coerceAtLeast(0)
+                list.scrollToPosition(page)
+            } else {
+                lm.scrollToPositionWithOffset(Reader.index, 200)
+            }
         } else if (shownIndex != Reader.index) {
             if (bookMode) {
-                val page = bookPages.indexOfFirst { Reader.index in it }.coerceAtLeast(0)
+                val page = bookPages.indexOfFirst { pageItems -> Reader.index in pageItems }.coerceAtLeast(0)
                 if (Reader.playing) list.scrollToPosition(page)
             } else {
                 adapter.notifyItemChanged(shownIndex)
@@ -409,14 +413,12 @@ class MainActivity : AppCompatActivity() {
         }
         shownIndex = Reader.index
         toolbar.title = Reader.title.ifEmpty { getString(R.string.app_name) }
-        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }
-        val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
-        val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
-        val progressPercent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
+        val progressPercent = if (Reader.sentences.isEmpty()) 0 else
+            ((Reader.index.toDouble() / Reader.sentences.size) * 100).roundToInt()
         toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""
         miniProgress.max = 100
         miniProgress.progress = progressPercent
-        if (browseSeek.max != max(1, Reader.sentences.size - 1)) browseSeek.max = max(1, Reader.sentences.size - 1)
+        browseSeek.max = max(1, Reader.sentences.size - 1)
         if (!browseSeek.isPressed) browseSeek.progress = Reader.index
         playBtn.text = if (Reader.playing) "⏸" else "▶"
         if (!seeking) {
@@ -427,41 +429,57 @@ class MainActivity : AppCompatActivity() {
 
     private fun toolbarSubtitle(): String {
         if (Reader.sentences.isEmpty()) return ""
-        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }
-        val cps = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
-        val mins = (remainingChars / cps / 60.0).roundToInt()
-        val pct = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
-        return "$pct% прочитано • осталось примерно $mins мин."
+        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { sentence -> sentence.length }
+        val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
+        val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
+        val percent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
+        return "$percent% прочитано • осталось примерно $minutesLeft мин."
     }
 
     private fun previewPosition(index: Int) {
         if (Reader.sentences.isEmpty()) return
         val target = index.coerceIn(0, Reader.sentences.lastIndex)
-        if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)) {
-            val page = bookPages.indexOfFirst { target in it }.coerceAtLeast(0)
+        val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+        if (bookMode) {
+            val page = bookPages.indexOfFirst { pageItems -> target in pageItems }.coerceAtLeast(0)
             list.smoothScrollToPosition(page)
-        } else list.smoothScrollToPosition(target)
+        } else {
+            list.smoothScrollToPosition(target)
+        }
     }
 
     private fun applyFrameColors() {
-        val p = getSharedPreferences("p", MODE_PRIVATE)
-        topFrame.setBackgroundColor(p.getInt("frame_top", 0xFF51433B.toInt()))
-        bottomFrame.setBackgroundColor(p.getInt("frame_bottom", 0xFF51433B.toInt()))
+        val prefs = getSharedPreferences("p", MODE_PRIVATE)
+        topFrame.setBackgroundColor(prefs.getInt("frame_top", 0xFF51433B.toInt()))
+        bottomFrame.setBackgroundColor(prefs.getInt("frame_bottom", 0xFF51433B.toInt()))
     }
 
     private fun frameColorsDialog() {
-        val colors = intArrayOf(0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(), 0xFF4CAF50.toInt(), 0xFFE91E63.toInt())
+        val colors = intArrayOf(
+            0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(),
+            0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(),
+            0xFF4CAF50.toInt(), 0xFFE91E63.toInt()
+        )
         val names = arrayOf("Тёмный", "Коричневый", "Золотистый", "Чёрный", "Белый", "Сине-серый", "Зелёный", "Розовый")
-        fun choose(key: String, label: String) {
-            val current = getSharedPreferences("p", MODE_PRIVATE).getInt(key, colors[1])
-            val selected = colors.indexOf(current).coerceAtLeast(0)
-            AlertDialog.Builder(this).setTitle(label).setSingleChoiceItems(names, selected) { d, which ->
-                getSharedPreferences("p", MODE_PRIVATE).edit().putInt(key, colors[which]).apply(); applyFrameColors(); d.dismiss()
-            }.setNegativeButton("Отмена", null).show()
-        }
-        AlertDialog.Builder(this).setTitle("Цвет рамок")
-            .setItems(arrayOf("Верхняя рамка", "Нижняя рамка")) { _, which -> choose(if (which == 0) "frame_top" else "frame_bottom", if (which == 0) "Верхняя рамка" else "Нижняя рамка") }
-            .setNegativeButton("Готово", null).show()
+        val labels = arrayOf("Верхняя рамка", "Нижняя рамка")
+        AlertDialog.Builder(this)
+            .setTitle("Цвет рамок")
+            .setItems(labels) { dialog, which ->
+                val key = if (which == 0) "frame_top" else "frame_bottom"
+                val current = getSharedPreferences("p", MODE_PRIVATE).getInt(key, colors[1])
+                val selected = colors.indexOf(current).coerceAtLeast(0)
+                AlertDialog.Builder(this)
+                    .setTitle(labels[which])
+                    .setSingleChoiceItems(names, selected) { colorDialog, colorIndex ->
+                        getSharedPreferences("p", MODE_PRIVATE).edit().putInt(key, colors[colorIndex]).apply()
+                        applyFrameColors()
+                        colorDialog.dismiss()
+                    }
+                    .setNegativeButton("Отмена", null)
+                    .show()
+            }
+            .setNegativeButton("Готово", null)
+            .show()
     }
 
     private fun cmd(action: String, index: Int = -1) {
