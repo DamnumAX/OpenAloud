@@ -29,7 +29,15 @@ object Loader {
 
     fun fromUri(ctx: Context, uri: Uri): Doc {
         val name = displayName(ctx, uri)
-        val mime = ctx.contentResolver.getType(uri).orEmpty()
+        val mime = if (uri.scheme == "file") {
+            when (uri.lastPathSegment?.substringAfterLast('.', "")?.lowercase()) {
+                "pdf" -> "application/pdf"
+                "epub" -> "application/epub+zip"
+                "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                "fb2" -> "application/x-fictionbook+xml"
+                else -> "text/plain"
+            }
+        } else ctx.contentResolver.getType(uri).orEmpty()
         val isEpub = name.endsWith(".epub", true) || mime == "application/epub+zip"
         val isFb2 = name.endsWith(".fb2", true) || name.endsWith(".fb2.zip", true) ||
             mime == "application/x-fictionbook+xml"
@@ -42,7 +50,7 @@ object Loader {
             isPdf -> listOf(pdf(ctx, uri))
             isDocx -> listOf(docx(ctx, uri))
             else -> {
-                val bytes = ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                val bytes = input(ctx, uri)!!.use { it.readBytes() }
                 listOf(decode(bytes))
             }
         }
@@ -115,7 +123,12 @@ object Loader {
 
     // ---------- чтение форматов ----------
 
+    private fun input(ctx: Context, uri: Uri) =
+        if (uri.scheme == "file") java.io.FileInputStream(requireNotNull(uri.path))
+        else ctx.contentResolver.openInputStream(uri)
+
     private fun displayName(ctx: Context, uri: Uri): String {
+        if (uri.scheme == "file") return java.io.File(uri.path ?: "").name
         ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
             ?.use { if (it.moveToFirst()) return it.getString(0) ?: "Документ" }
         return uri.lastPathSegment ?: "Документ"
@@ -146,7 +159,7 @@ object Loader {
     }
 
     private fun fb2(ctx: Context, uri: Uri): String {
-        val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        val bytes = input(ctx, uri)?.use { it.readBytes() }
             ?: error("Не удалось открыть FB2")
         val xml = if (bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4b.toByte()) {
             var content: ByteArray? = null
@@ -183,7 +196,7 @@ object Loader {
 
     private fun pdf(ctx: Context, uri: Uri): String {
         PDFBoxResourceLoader.init(ctx)
-        ctx.contentResolver.openInputStream(uri).use { input ->
+        input(ctx, uri).use { input ->
             requireNotNull(input) { "Не удалось открыть PDF" }
             PDDocument.load(input).use { document ->
                 require(!document.isEncrypted) { "PDF защищён паролем и пока не поддерживается" }
@@ -194,7 +207,7 @@ object Loader {
 
     private fun docx(ctx: Context, uri: Uri): String {
         var documentXml: String? = null
-        ZipInputStream(ctx.contentResolver.openInputStream(uri)?.buffered()
+        ZipInputStream(input(ctx, uri)?.buffered()
             ?: error("Не удалось открыть DOCX")).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
@@ -215,7 +228,7 @@ object Loader {
 
     private fun epub(ctx: Context, uri: Uri): List<String> {
         val files = HashMap<String, ByteArray>()
-        ZipInputStream(ctx.contentResolver.openInputStream(uri)!!.buffered()).use { z ->
+        ZipInputStream(input(ctx, uri)!!.buffered()).use { z ->
             var e = z.nextEntry
             while (e != null) {
                 if (!e.isDirectory) files[e.name] = z.readBytes()
