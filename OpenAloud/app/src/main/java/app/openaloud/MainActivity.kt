@@ -133,8 +133,9 @@ class MainActivity : AppCompatActivity() {
                     return@setOnTouchListener true
                 }
                 val now = android.os.SystemClock.uptimeMillis()
-                val child = rv.findChildViewUnder(event.x, event.y)
-                val position = if (child == null) RecyclerView.NO_POSITION else rv.getChildAdapterPosition(child)
+                val recycler = rv as RecyclerView
+                val child = recycler.findChildViewUnder(event.x, event.y)
+                val position = if (child == null) RecyclerView.NO_POSITION else recycler.getChildAdapterPosition(child)
                 if (position != RecyclerView.NO_POSITION && position == lastTapPosition && now - lastTapAt in 1..350) {
                     cmd(TtsService.SEEK_PLAY, position)
                     lastTapAt = 0L
