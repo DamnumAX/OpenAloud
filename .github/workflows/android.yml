@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -29,6 +29,16 @@ jobs:
           test -f OpenAloud.zip
           unzip -q OpenAloud.zip -d .
           test -f OpenAloud/app/build.gradle.kts
+
+      - name: Commit extracted Android source
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add OpenAloud
+          if ! git diff --cached --quiet; then
+            git commit -m "build: add extracted Android source"
+            git push
+          fi
 
       - name: Package extracted source for inspection
         run: zip -qr OpenAloud-source.zip OpenAloud
