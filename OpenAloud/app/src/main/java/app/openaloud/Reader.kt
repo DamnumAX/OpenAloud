@@ -45,6 +45,30 @@ object Prefs {
     }
     fun bookmarks(c: Context): org.json.JSONArray =
         org.json.JSONArray(sp(c).getString("bookmarks", "[]") ?: "[]")
+    fun addHistory(c: Context, id: String, title: String) {
+        if (!id.startsWith("content:")) {
+            val old = sp(c).getString("history", "[]") ?: "[]"
+            val source = org.json.JSONArray(old)
+            val out = org.json.JSONArray()
+            for (i in 0 until source.length()) {
+                val item = source.optJSONObject(i) ?: continue
+                if (item.optString("id") != id) out.put(item)
+            }
+            out.put(org.json.JSONObject().put("id", id).put("title", title).put("opened", System.currentTimeMillis()))
+            val trimmed = org.json.JSONArray()
+            for (i in (out.length() - 1).coerceAtLeast(0) downTo 0) {
+                if (trimmed.length() >= 40) break
+                trimmed.put(out.getJSONObject(i))
+            }
+            sp(c).edit().putString("history", trimmed.toString()).apply()
+        }
+    }
+    fun history(c: Context): org.json.JSONArray =
+        org.json.JSONArray(sp(c).getString("history", "[]") ?: "[]")
+    fun fontSize(c: Context) = sp(c).getInt("font_size", 18).coerceIn(14, 32)
+    fun setFontSize(c: Context, v: Int) = sp(c).edit().putInt("font_size", v.coerceIn(14, 32)).apply()
+    fun theme(c: Context) = sp(c).getInt("theme", 0)
+    fun setTheme(c: Context, v: Int) = sp(c).edit().putInt("theme", v.coerceIn(0, 2)).apply()
     fun removeBookmark(c: Context, index: Int) {
         val a = bookmarks(c)
         if (index in 0 until a.length()) {
