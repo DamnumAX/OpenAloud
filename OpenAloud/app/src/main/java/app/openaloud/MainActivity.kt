@@ -94,8 +94,6 @@ class MainActivity : AppCompatActivity() {
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
-        list.isVerticalScrollBarEnabled = true
-        list.isScrollbarFadingEnabled = false
         val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(detector: ScaleGestureDetector): Boolean {
                 val next = (Prefs.fontSize(this@MainActivity) * detector.scaleFactor).roundToInt().coerceIn(14, 32)
