@@ -143,15 +143,24 @@ class MainActivity : AppCompatActivity() {
                 val child = recycler.findChildViewUnder(event.x, event.y)
                 val position = if (child == null) RecyclerView.NO_POSITION else recycler.getChildAdapterPosition(child)
                 if (position != RecyclerView.NO_POSITION && position == lastTapPosition && now - lastTapAt in 1..350) {
+                    pendingCenterTap?.let { rv.removeCallbacks(it) }
+                    pendingCenterTap = null
                     cmd(TtsService.SEEK_PLAY, position)
                     lastTapAt = 0L
                     true
                 } else {
                     lastTapAt = now
                     lastTapPosition = position
-                    if (position == RecyclerView.NO_POSITION) {
-                        if (event.x in (rv.width * 0.35f)..(rv.width * 0.65f)) setControlsExpanded(!controlsExpanded)
-                        else if (event.x < rv.width * 0.3f) pageBy(-1)
+                    if (event.x in (rv.width * 0.35f)..(rv.width * 0.65f)) {
+                        if (position == RecyclerView.NO_POSITION) setControlsExpanded(!controlsExpanded)
+                        else {
+                            pendingCenterTap?.let { rv.removeCallbacks(it) }
+                            val action = Runnable { setControlsExpanded(!controlsExpanded); pendingCenterTap = null }
+                            pendingCenterTap = action
+                            rv.postDelayed(action, 360L)
+                        }
+                    } else if (position == RecyclerView.NO_POSITION) {
+                        if (event.x < rv.width * 0.3f) pageBy(-1)
                         else if (event.x > rv.width * 0.7f) pageBy(1)
                     }
                     false
