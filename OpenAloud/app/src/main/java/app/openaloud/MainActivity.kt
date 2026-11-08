@@ -458,10 +458,17 @@ class MainActivity : AppCompatActivity() {
                     }
                     .setNeutralButton("Автоматический") { _, _ ->
                         Prefs.setVoice(this, "")
-                        engine.shutdown()
+                        activeEngine.shutdown()
+                        voicePickerTts = null
                     }
-                    .setNegativeButton("Закрыть") { _, _ -> engine.shutdown() }
-                    .setOnCancelListener { engine.shutdown() }.show()
+                    .setNegativeButton("Закрыть") { _, _ ->
+                        activeEngine.shutdown()
+                        voicePickerTts = null
+                    }
+                    .setOnCancelListener {
+                        activeEngine.shutdown()
+                        voicePickerTts = null
+                    }.show()
             }
         }
         voicePickerTts = engine
