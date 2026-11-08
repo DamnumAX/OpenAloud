@@ -13,6 +13,9 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.CheckBox
+import org.json.JSONObject
+import java.io.File
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.SeekBar
@@ -41,6 +44,30 @@ class MainActivity : AppCompatActivity() {
     private var shownDoc: String? = null
     private var shownIndex = 0
     private var seeking = false
+
+
+    private val importBook = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) Thread {
+            try {
+                val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+                    if (it.moveToFirst()) it.getString(0) else null
+                } ?: "Книга"
+                val dir = File(filesDir, "library").apply { mkdirs() }
+                val safe = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
+                var target = File(dir, safe)
+                var n = 1
+                while (target.exists()) { target = File(dir, n++.toString() + "_" + safe) }
+                contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { output -> input.copyTo(output) } }
+                runOnUiThread {
+                    val a = Prefs.library(this)
+                    a.put(JSONObject().put("path", target.absolutePath).put("title", name).put("folder", ""))
+                    Prefs.saveLibrary(this, a)
+                    toast("Книга сохранена в библиотеке")
+                    libraryDialog()
+                }
+            } catch (e: Exception) { runOnUiThread { toast("Ошибка импорта: " + e.message) } }
+        }.start()
+    }
 
     private val openDoc = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -207,6 +234,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 10, 9, "Библиотека и история")
         menu.add(0, 11, 10, "Размер текста")
         menu.add(0, 12, 11, "Тема оформления")
+        menu.add(0, 13, 12, "Автопереход к следующей книге")
         return true
     }
 
@@ -225,11 +253,122 @@ class MainActivity : AppCompatActivity() {
             7 -> sentencePauseDialog()
             8 -> saveBookmark()
             9 -> bookmarksDialog()
-            10 -> historyDialog()
+            10 -> libraryDialog()
             11 -> fontSizeDialog()
             12 -> themeDialog()
+            13 -> autoNextDialog()
         }
         return true
+    }
+
+
+    private fun libraryDialog() {
+        val folders = Prefs.folders(this)
+        val names = ArrayList<String>()
+        names.add("Все сохранённые книги")
+        for (i in 0 until folders.length()) names.add("Папка: " + folders.optString(i))
+        AlertDialog.Builder(this).setTitle("Моя библиотека")
+            .setItems(names.toTypedArray()) { _, which ->
+                showLibraryBooks(if (which == 0) "" else folders.optString(which - 1))
+            }
+            .setPositiveButton("Добавить файл") { _, _ -> importBook.launch(arrayOf("*/*")) }
+            .setNeutralButton("Управление папками") { _, _ -> foldersDialog() }
+            .setNegativeButton("Закрыть", null).show()
+    }
+
+    private fun showLibraryBooks(folder: String) {
+        val a = Prefs.library(this)
+        val books = ArrayList<JSONObject>()
+        val labels = ArrayList<String>()
+        for (i in 0 until a.length()) {
+            val b = a.optJSONObject(i) ?: continue
+            if (folder.isNotEmpty() && b.optString("folder") != folder) continue
+            books.add(b); labels.add(b.optString("title"))
+        }
+        AlertDialog.Builder(this).setTitle(if (folder.isEmpty()) "Все книги" else folder)
+            .setItems(labels.toTypedArray()) { _, which ->
+                val file = File(books[which].optString("path"))
+                if (file.exists()) openUri(Uri.fromFile(file)) else toast("Файл не найден")
+            }
+            .setPositiveButton("Добавить") { _, _ -> importBook.launch(arrayOf("*/*")) }
+            .setNeutralButton("Управление") { _, _ -> booksDialog(books) }
+            .setNegativeButton("Назад") { _, _ -> libraryDialog() }.show()
+    }
+
+    private fun booksDialog(books: List<JSONObject>) {
+        AlertDialog.Builder(this).setTitle("Управление книгами")
+            .setItems(books.map { it.optString("title") }.toTypedArray()) { _, which ->
+                val b = books[which]
+                val edit = EditText(this).setText(b.optString("title"))
+                AlertDialog.Builder(this).setTitle("Название книги").setView(edit)
+                    .setPositiveButton("Сохранить") { _, _ ->
+                        b.put("title", edit.text.toString().trim())
+                        saveBook(b)
+                        libraryDialog()
+                    }
+                    .setNeutralButton("Удалить") { _, _ ->
+                        File(b.optString("path")).delete()
+                        val all = Prefs.library(this); val out = org.json.JSONArray()
+                        for (i in 0 until all.length()) if (all.optJSONObject(i)?.optString("path") != b.optString("path")) out.put(all.get(i))
+                        Prefs.saveLibrary(this, out); libraryDialog()
+                    }.setNegativeButton("Отмена", null).show()
+            }.setNegativeButton("Назад", null).show()
+    }
+
+    private fun saveBook(book: JSONObject) {
+        val a = Prefs.library(this)
+        for (i in 0 until a.length()) if (a.optJSONObject(i)?.optString("path") == book.optString("path")) { a.put(i, book); break }
+        Prefs.saveLibrary(this, a)
+    }
+
+    private fun foldersDialog() {
+        val folders = Prefs.folders(this)
+        val actions = arrayOf("Создать папку", "Переименовать", "Удалить")
+        AlertDialog.Builder(this).setTitle("Папки библиотеки").setItems(actions) { _, action ->
+            if (action == 0) {
+                val edit = EditText(this).apply { hint = "Название папки" }
+                AlertDialog.Builder(this).setTitle("Новая папка").setView(edit)
+                    .setPositiveButton("Создать") { _, _ ->
+                        val n = edit.text.toString().trim()
+                        if (n.isNotEmpty()) { folders.put(n); Prefs.saveFolders(this, folders) }
+                        libraryDialog()
+                    }.setNegativeButton("Отмена", null).show()
+            } else if (folders.length() > 0) {
+                val names = Array(folders.length()) { folders.optString(it) }
+                AlertDialog.Builder(this).setItems(names) { _, index ->
+                    val old = names[index]
+                    if (action == 1) {
+                        val edit = EditText(this).setText(old)
+                        AlertDialog.Builder(this).setTitle("Новое название").setView(edit)
+                            .setPositiveButton("Сохранить") { _, _ ->
+                                val n = edit.text.toString().trim()
+                                if (n.isNotEmpty()) {
+                                    folders.put(index, n)
+                                    val a = Prefs.library(this)
+                                    for (i in 0 until a.length()) a.optJSONObject(i)?.let { if (it.optString("folder") == old) it.put("folder", n) }
+                                    Prefs.saveLibrary(this, a); Prefs.saveFolders(this, folders)
+                                }
+                                libraryDialog()
+                            }.setNegativeButton("Отмена", null).show()
+                    } else {
+                        folders.remove(index)
+                        val a = Prefs.library(this)
+                        for (i in 0 until a.length()) a.optJSONObject(i)?.let { if (it.optString("folder") == old) it.put("folder", "") }
+                        Prefs.saveLibrary(this, a); Prefs.saveFolders(this, folders); libraryDialog()
+                    }
+                }.show()
+            } else toast("Папок пока нет")
+        }.setNegativeButton("Готово") { _, _ -> libraryDialog() }.show()
+    }
+
+    private fun autoNextDialog() {
+        val check = CheckBox(this).apply {
+            text = "Открывать следующую книгу автоматически"
+            isChecked = Prefs.autoNext(this@MainActivity)
+        }
+        AlertDialog.Builder(this).setTitle("Переход между книгами").setView(check)
+            .setPositiveButton("Сохранить") { _, _ -> Prefs.setAutoNext(this, check.isChecked) }
+            .setNegativeButton("Отмена", null).show()
     }
 
     private fun historyDialog() {
