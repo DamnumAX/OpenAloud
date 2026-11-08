@@ -77,7 +77,8 @@ object Loader {
     private fun build(id: String, title: String, parts: List<String>): Doc {
         val sentences = ArrayList<String>()
         val chapters = ArrayList<Int>()
-        for (p in parts) {
+        for (raw in parts) {
+            val p = normalizeExtractedText(raw)
             val before = sentences.size
             split(p, sentences)
             if (sentences.size > before) chapters.add(before)
@@ -85,6 +86,19 @@ object Loader {
         if (chapters.isEmpty()) chapters.add(0)
         val sample = sentences.take(60).joinToString(" ")
         return Doc(id, title, sentences, chapters, detect(sample))
+    }
+
+    private fun normalizeExtractedText(raw: String): String {
+        return raw
+            .replace("\\r\\n", "\n")
+            .replace("\\n", "\n")
+            .replace("\\r", "\n")
+            .replace("\\t", " ")
+            .replace("\r\n", "\n")
+            .replace('\r', '\n')
+            .replace('\u0000', ' ')
+            .replace(Regex("[\\u0001-\\u0008\\u000B\\u000C\\u000E-\\u001F]"), "")
+            .replace('\u00A0', ' ')
     }
 
     private fun split(text: String, out: MutableList<String>) {
