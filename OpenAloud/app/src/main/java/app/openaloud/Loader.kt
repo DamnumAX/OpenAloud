@@ -31,11 +31,14 @@ object Loader {
         val name = displayName(ctx, uri)
         val mime = ctx.contentResolver.getType(uri).orEmpty()
         val isEpub = name.endsWith(".epub", true) || mime == "application/epub+zip"
+        val isFb2 = name.endsWith(".fb2", true) || name.endsWith(".fb2.zip", true) ||
+            mime == "application/x-fictionbook+xml"
         val isPdf = name.endsWith(".pdf", true) || mime == "application/pdf"
         val isDocx = name.endsWith(".docx", true) ||
             mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         val parts = when {
             isEpub -> epub(ctx, uri)
+            isFb2 -> listOf(fb2(ctx, uri))
             isPdf -> listOf(pdf(ctx, uri))
             isDocx -> listOf(docx(ctx, uri))
             else -> {
@@ -140,6 +143,42 @@ object Loader {
             }
         }
         return parts.joinToString("/")
+    }
+
+    private fun fb2(ctx: Context, uri: Uri): String {
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: error("Не удалось открыть FB2")
+        val xml = if (bytes.size >= 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4b.toByte()) {
+            var content: ByteArray? = null
+            ZipInputStream(bytes.inputStream()).use { zip ->
+                var entry = zip.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory && entry.name.endsWith(".fb2", true)) {
+                        content = zip.readBytes()
+                        break
+                    }
+                    entry = zip.nextEntry
+                }
+            }
+            decode(content ?: error("В ZIP-архиве не найден FB2-файл"))
+        } else decode(bytes)
+        return fb2ToText(xml)
+    }
+
+    private fun fb2ToText(xml: String): String {
+        val bodies = Regex("(?is)<body\\b[^>]*>(.*?)</body>").findAll(xml)
+            .map { it.groupValues[1] }.toList()
+        val source = (if (bodies.isEmpty()) xml else bodies.joinToString("\\n") )
+            .replace(Regex("(?is)<binary\\b.*?</binary>"), "")
+            .replace(Regex("(?is)<(p|v|subtitle|text-author|date|th|td)\\b[^>]*>"), "")
+            .replace(Regex("(?i)</(p|v|subtitle|text-author|date|th|td)\\s*>"), "\\n")
+            .replace(Regex("(?i)<empty-line\\b[^>]*/?>"), "\\n")
+            .replace(Regex("(?i)<br\\s*/?>"), "\\n")
+            .replace(Regex("(?is)<[^>]+>"), "")
+        return HtmlCompat.fromHtml(source, HtmlCompat.FROM_HTML_MODE_LEGACY)
+            .toString().replace("\\u00A0", " ")
+            .replace(Regex("[\\t ]+"), " ")
+            .replace(Regex(" *\\n *"), "\\n").trim()
     }
 
     private fun pdf(ctx: Context, uri: Uri): String {
