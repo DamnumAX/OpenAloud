@@ -35,6 +35,9 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.PagerSnapHelper
+import android.app.Dialog
+import android.widget.ProgressBar
+import android.widget.ScrollView
 import com.google.android.material.appbar.MaterialToolbar
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -63,7 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var bookPages: List<List<Int>> = emptyList()
     private var lastPageTapAt = 0L
     private var lastPageTap = RecyclerView.NO_POSITION
-    private var pagerAttached = false
+    private var pagerSnapHelper: PagerSnapHelper? = null
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -285,11 +288,12 @@ class MainActivity : AppCompatActivity() {
         if (bookMode) {
             buildBookPages()
             list.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
-            if (!pagerAttached) {
-                PagerSnapHelper().attachToRecyclerView(list)
-                pagerAttached = true
+            if (pagerSnapHelper == null) {
+                pagerSnapHelper = PagerSnapHelper().also { it.attachToRecyclerView(list) }
             }
         } else {
+            pagerSnapHelper?.attachToRecyclerView(null)
+            pagerSnapHelper = null
             list.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         }
         adapter.notifyDataSetChanged()
@@ -438,22 +442,95 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun libraryDialog() {
-        val folders = Prefs.folders(this)
-        val names = ArrayList<String>()
-        names.add("Все сохранённые книги")
-        names.add("Недавно открытые")
-        for (i in 0 until folders.length()) names.add("Папка: " + folders.optString(i))
-        AlertDialog.Builder(this).setTitle("Моя библиотека")
-            .setItems(names.toTypedArray()) { _, which ->
-                when (which) {
-                    0 -> showLibraryBooks("")
-                    1 -> historyDialog()
-                    else -> showLibraryBooks(folders.optString(which - 2))
-                }
+        val dialog = Dialog(this)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 16, 20, 12)
+        }
+        val title = TextView(this).apply {
+            text = "Моя библиотека"
+            textSize = 22f
+            setPadding(4, 8, 4, 16)
+        }
+        root.addView(title)
+        val scroll = ScrollView(this)
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        scroll.addView(rows)
+        val books = Prefs.library(this)
+        if (books.length() == 0) {
+            rows.addView(TextView(this).apply {
+                text = "Здесь пока нет книг. Нажми «Добавить книги», чтобы импортировать файлы."
+                textSize = 16f
+                setPadding(12, 24, 12, 24)
+            })
+        }
+        for (i in 0 until books.length()) {
+            val book = books.optJSONObject(i) ?: continue
+            val id = Uri.fromFile(File(book.optString("path"))).toString()
+            val progress = Prefs.pos(this, id)
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(12, 12, 12, 12)
+                setBackgroundResource(android.R.drawable.list_selector_background)
+                isClickable = true
+                isFocusable = true
             }
-            .setPositiveButton("Добавить файл") { _, _ -> importBook.launch(arrayOf("*/*")) }
-            .setNeutralButton("Управление папками") { _, _ -> foldersDialog() }
-            .setNegativeButton("Закрыть", null).show()
+            val name = TextView(this).apply {
+                text = book.optString("title", "Книга")
+                textSize = 17f
+                maxLines = 2
+            }
+            val total = if (id == Reader.docId) Reader.sentences.size else book.optInt("total", 0)
+            val percent = if (total > 0) ((progress.toDouble() / total) * 100).toInt().coerceIn(0, 100) else 0
+            val detail = TextView(this).apply {
+                text = if (total > 0) "$percent% прочитано" else "Ещё не открывалась"
+                textSize = 12f
+                setPadding(0, 4, 0, 4)
+            }
+            val bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 100
+                this.progress = percent
+            }
+            row.addView(name)
+            row.addView(detail)
+            row.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 8))
+            row.setOnClickListener {
+                val file = File(book.optString("path"))
+                if (file.exists()) { dialog.dismiss(); openUri(Uri.fromFile(file)) }
+                else toast("Файл не найден")
+            }
+            row.setOnLongClickListener {
+                val one = listOf(book)
+                dialog.dismiss()
+                booksDialog(one)
+                true
+            }
+            rows.addView(row)
+            val divider = View(this).apply { setBackgroundColor(0x33222222) }
+            rows.addView(divider, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val buttons = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.END
+        }
+        val add = Button(this).apply {
+            text = "Добавить книги"
+            setOnClickListener { dialog.dismiss(); importBook.launch(arrayOf("*/*")) }
+        }
+        val foldersButton = Button(this).apply {
+            text = "Папки"
+            setOnClickListener { dialog.dismiss(); foldersDialog() }
+        }
+        val close = Button(this).apply {
+            text = "Закрыть"
+            setOnClickListener { dialog.dismiss() }
+        }
+        buttons.addView(add); buttons.addView(foldersButton); buttons.addView(close)
+        root.addView(buttons)
+        dialog.setContentView(root)
+        dialog.show()
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
     private fun showLibraryBooks(folder: String) {
@@ -871,8 +948,14 @@ class MainActivity : AppCompatActivity() {
             val indices = if (book) bookPages.getOrNull(pos).orEmpty() else listOf(pos)
             h.tv.text = indices.joinToString("\n\n") { Reader.sentences.getOrElse(it) { "" } }
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
-            val pad = (Prefs.sidePadding(this@MainActivity) * resources.displayMetrics.density).roundToInt()
-            h.tv.setPadding(pad, (if (book) 24 else 6) * resources.displayMetrics.density.toInt(), pad, (if (book) 24 else 6) * resources.displayMetrics.density.toInt())
+            val density = resources.displayMetrics.density
+            val pad = (Prefs.sidePadding(this@MainActivity) * density).roundToInt()
+            val verticalPad = ((if (book) 24 else 6) * density).roundToInt()
+            h.tv.layoutParams = h.tv.layoutParams.apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+                height = if (book) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT
+            }
+            h.tv.setPadding(pad, verticalPad, pad, verticalPad)
             h.tv.setTextIsSelectable(false)
             h.tv.gravity = if (book) android.view.Gravity.CENTER_VERTICAL else android.view.Gravity.TOP
             h.tv.setBackgroundColor(if (Reader.index in indices) 0x22FFC107 else Color.TRANSPARENT)
