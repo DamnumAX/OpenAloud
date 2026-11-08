@@ -554,6 +554,21 @@ class MainActivity : AppCompatActivity() {
             val divider = View(this).apply { setBackgroundColor(0x33222222) }
             rows.addView(divider, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
         }
+        val folders = Prefs.folders(this)
+        for (i in 0 until folders.length()) {
+            val folderName = folders.optString(i)
+            val count = (0 until books.length()).count { books.optJSONObject(it)?.optString("folder") == folderName }
+            val folderRow = TextView(this).apply {
+                text = "📁  $folderName  ·  $count"
+                textSize = 16f
+                setPadding(16, 14, 16, 14)
+                setBackgroundResource(android.R.drawable.list_selector_background)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { dialog.dismiss(); showLibraryBooks(folderName) }
+            }
+            rows.addView(folderRow)
+        }
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val buttons = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
