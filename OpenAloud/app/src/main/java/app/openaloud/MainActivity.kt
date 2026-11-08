@@ -34,6 +34,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.recyclerview.widget.PagerSnapHelper
 import com.google.android.material.appbar.MaterialToolbar
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -59,6 +60,10 @@ class MainActivity : AppCompatActivity() {
     private var touchStartY = 0f
     private var controlsExpanded = true
     private var pendingCenterTap: Runnable? = null
+    private var bookPages: List<List<Int>> = emptyList()
+    private var lastPageTapAt = 0L
+    private var lastPageTap = RecyclerView.NO_POSITION
+    private var pagerAttached = false
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -118,6 +123,7 @@ class MainActivity : AppCompatActivity() {
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
+        configureReaderMode()
         // Disable platform scrollbar drawing: some MIUI builds crash in View.onDrawScrollBars.
         list.isVerticalScrollBarEnabled = false
         list.isHorizontalScrollBarEnabled = false
@@ -268,17 +274,63 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Режим чтения")
             .setSingleChoiceItems(arrayOf("Свиток — вертикальная прокрутка", "Книга — перелистывание влево и вправо"), if (isBook) 1 else 0) { dialog, which ->
                 prefs.edit().putBoolean("reading_mode_book", which == 1).apply()
-                toast(if (which == 1) "Режим книги включён: листайте текст влево и вправо" else "Режим свитка включён: прокручивайте текст вверх и вниз")
+                configureReaderMode()
+                toast(if (which == 1) "Книжный режим включён" else "Режим свитка включён")
                 dialog.dismiss()
             }.setNegativeButton("Закрыть", null).show()
     }
 
+    private fun configureReaderMode() {
+        val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+        if (bookMode) {
+            buildBookPages()
+            list.layoutManager = LinearLayoutManager(this, RecyclerView.HORIZONTAL, false)
+            if (!pagerAttached) {
+                PagerSnapHelper().attachToRecyclerView(list)
+                pagerAttached = true
+            }
+        } else {
+            list.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
+        }
+        adapter.notifyDataSetChanged()
+        if (bookMode) {
+            val page = bookPages.indexOfFirst { Reader.index in it }.coerceAtLeast(0)
+            list.scrollToPosition(page)
+        } else if (Reader.sentences.isNotEmpty()) {
+            (list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(Reader.index, 0)
+        }
+    }
+
+    // Разбиваем документ на экранные страницы по реальной ширине и высоте области чтения.
+    private fun buildBookPages() {
+        if (Reader.sentences.isEmpty()) { bookPages = emptyList(); return }
+        val width = (list.width - (32 * resources.displayMetrics.density).roundToInt()).coerceAtLeast(240)
+        val height = (list.height - (32 * resources.displayMetrics.density).roundToInt()).coerceAtLeast(300)
+        val font = Prefs.fontSize(this) * resources.displayMetrics.scaledDensity
+        val charsPerLine = (width / (font * 0.53f)).toInt().coerceAtLeast(18)
+        val linesPerPage = (height / (font * 1.45f)).toInt().coerceAtLeast(5)
+        val capacity = (charsPerLine * linesPerPage * 0.82f).toInt().coerceAtLeast(350)
+        val pages = ArrayList<List<Int>>()
+        var current = ArrayList<Int>()
+        var count = 0
+        Reader.sentences.forEachIndexed { index, sentence ->
+            if (current.isNotEmpty() && count + sentence.length > capacity) {
+                pages.add(current)
+                current = ArrayList()
+                count = 0
+            }
+            current.add(index)
+            count += sentence.length + 1
+        }
+        if (current.isNotEmpty()) pages.add(current)
+        bookPages = pages
+    }
+
     private fun pageBy(direction: Int) {
         val lm = list.layoutManager as LinearLayoutManager
-        val first = lm.findFirstVisibleItemPosition().coerceAtLeast(0)
-        val last = lm.findLastVisibleItemPosition().coerceAtLeast(first)
-        val page = (last - first + 1).coerceAtLeast(1)
-        lm.scrollToPosition((first + direction * page).coerceIn(0, (adapter.itemCount - 1).coerceAtLeast(0)))
+        val current = lm.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val target = (current + direction).coerceIn(0, (adapter.itemCount - 1).coerceAtLeast(0))
+        list.smoothScrollToPosition(target)
     }
 
     private fun applyReaderBackground() {
@@ -288,15 +340,23 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refresh() {
+        val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+        if (bookMode && (shownDoc != Reader.docId || bookPages.isEmpty())) buildBookPages()
         val lm = list.layoutManager as LinearLayoutManager
         if (shownDoc != Reader.docId) {
             shownDoc = Reader.docId
             adapter.notifyDataSetChanged()
-            lm.scrollToPositionWithOffset(Reader.index, 200)
+            if (bookMode) list.scrollToPosition(bookPages.indexOfFirst { Reader.index in it }.coerceAtLeast(0))
+            else lm.scrollToPositionWithOffset(Reader.index, 200)
         } else if (shownIndex != Reader.index) {
-            adapter.notifyItemChanged(shownIndex)
-            adapter.notifyItemChanged(Reader.index)
-            if (Reader.playing) lm.scrollToPositionWithOffset(Reader.index, 200)
+            if (bookMode) {
+                val page = bookPages.indexOfFirst { Reader.index in it }.coerceAtLeast(0)
+                if (Reader.playing) list.scrollToPosition(page)
+            } else {
+                adapter.notifyItemChanged(shownIndex)
+                adapter.notifyItemChanged(Reader.index)
+                if (Reader.playing) lm.scrollToPositionWithOffset(Reader.index, 200)
+            }
         }
         shownIndex = Reader.index
         toolbar.title = Reader.title.ifEmpty { getString(R.string.app_name) }
@@ -798,18 +858,37 @@ class MainActivity : AppCompatActivity() {
     }
 
     inner class SentenceAdapter : RecyclerView.Adapter<VH>() {
-        override fun getItemCount() = Reader.sentences.size
-        override fun onCreateViewHolder(p: ViewGroup, t: Int) =
-            VH(layoutInflater.inflate(R.layout.item_sentence, p, false) as TextView)
+        private fun isBookMode() = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+        override fun getItemCount() = if (isBookMode()) bookPages.size else Reader.sentences.size
+        override fun onCreateViewHolder(p: ViewGroup, t: Int): VH {
+            val tv = layoutInflater.inflate(R.layout.item_sentence, p, false) as TextView
+            if (isBookMode()) tv.layoutParams = RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            return VH(tv)
+        }
 
         override fun onBindViewHolder(h: VH, pos: Int) {
-            h.tv.text = Reader.sentences[pos]
+            val book = isBookMode()
+            val indices = if (book) bookPages.getOrNull(pos).orEmpty() else listOf(pos)
+            h.tv.text = indices.joinToString("\n\n") { Reader.sentences.getOrElse(it) { "" } }
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
             val pad = (Prefs.sidePadding(this@MainActivity) * resources.displayMetrics.density).roundToInt()
-            h.tv.setPadding(pad, (6 * resources.displayMetrics.density).roundToInt(), pad, (6 * resources.displayMetrics.density).roundToInt())
+            h.tv.setPadding(pad, (if (book) 24 else 6) * resources.displayMetrics.density.toInt(), pad, (if (book) 24 else 6) * resources.displayMetrics.density.toInt())
             h.tv.setTextIsSelectable(false)
-            h.tv.setBackgroundColor(if (pos == Reader.index) 0x66FFC107 else Color.TRANSPARENT)
-            h.tv.setOnClickListener { /* позицию чтения меняет отдельное действие */ }
+            h.tv.gravity = if (book) android.view.Gravity.CENTER_VERTICAL else android.view.Gravity.TOP
+            h.tv.setBackgroundColor(if (Reader.index in indices) 0x22FFC107 else Color.TRANSPARENT)
+            h.tv.setOnClickListener {
+                val now = System.currentTimeMillis()
+                val same = if (book) lastPageTap == pos else lastPageTap == indices.firstOrNull()
+                if (same && now - lastPageTapAt < 450) {
+                    val target = if (book) indices.firstOrNull() ?: 0 else pos
+                    cmd(TtsService.SEEK_PLAY, target)
+                    lastPageTapAt = 0L
+                    toast("Озвучивание начато с выбранного места")
+                } else {
+                    lastPageTapAt = now
+                    lastPageTap = if (book) pos else indices.firstOrNull() ?: pos
+                }
+            }
         }
     }
 }
