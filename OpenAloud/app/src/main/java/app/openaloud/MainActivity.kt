@@ -917,7 +917,58 @@ class MainActivity : AppCompatActivity() {
             }.setNegativeButton("Отмена", null).show()
     }
 
-    private fun createTextDialog() {\n        val edit = EditText(this).apply { hint = "Вставьте или напишите текст здесь"; minLines = 8; gravity = android.view.Gravity.TOP }\n        val name = EditText(this).apply { hint = "Название текста" }\n        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 0); addView(name); addView(edit, LinearLayout.LayoutParams(-1, 0, 1f)) }\n        val cm = getSystemService(ClipboardManager::class.java)\n        cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()?.let { edit.setText(it) }\n        AlertDialog.Builder(this).setTitle("Новый текст") .setView(box)\n            .setPositiveButton("Сохранить в библиотеку и открыть") { _, _ ->\n                val text = edit.text.toString().trim(); if (text.isEmpty()) { toast("Текст пустой"); return@setPositiveButton }\n                val title = name.text.toString().trim().ifBlank { "Мой текст" }\n                Thread { try {\n                    val dir = File(filesDir, "library").apply { mkdirs() }; val safe = title.replace(Regex("[^A-Za-z0-9А-Яа-я._-]"), "_").take(70)\n                    var file = File(dir, "$safe.txt"); var n = 1; while (file.exists()) file = File(dir, "${safe}_${n++}.txt")\n                    file.writeText(text, Charsets.UTF_8)\n                    val a = Prefs.library(this); a.put(JSONObject().put("path", file.absolutePath).put("title", title).put("folder", "")); Prefs.saveLibrary(this, a)\n                    runOnUiThread { openUri(Uri.fromFile(file)); toast("Текст сохранён в библиотеке") }\n                } catch (e: Exception) { runOnUiThread { toast("Не удалось сохранить: ${e.message}") } } }.start()\n            }.setNegativeButton("Отмена", null).show()\n    }\n\n    private fun paste() {
+    private fun createTextDialog() {
+        val edit = EditText(this).apply {
+            hint = "Вставьте или напишите текст здесь"
+            minLines = 8
+            gravity = android.view.Gravity.TOP
+        }
+        val name = EditText(this).apply { hint = "Название текста" }
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24, 8, 24, 0)
+            addView(name)
+            addView(edit, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        val clipboard = getSystemService(ClipboardManager::class.java)
+        clipboard.primaryClip?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)?.coerceToText(this)?.toString()?.let { edit.setText(it) }
+
+        AlertDialog.Builder(this)
+            .setTitle("Новый текст")
+            .setView(box)
+            .setPositiveButton("Сохранить в библиотеку и открыть") { _, _ ->
+                val content = edit.text.toString().trim()
+                if (content.isEmpty()) {
+                    toast("Текст пустой")
+                    return@setPositiveButton
+                }
+                val title = name.text.toString().trim().ifBlank { "Мой текст" }
+                Thread {
+                    try {
+                        val dir = File(filesDir, "library").apply { mkdirs() }
+                        val safe = title.replace(Regex("[^A-Za-z0-9А-Яа-я._-]"), "_").take(70)
+                        var file = File(dir, "$safe.txt")
+                        var n = 1
+                        while (file.exists()) file = File(dir, "${safe}_${n++}.txt")
+                        file.writeText(content, Charsets.UTF_8)
+                        val library = Prefs.library(this)
+                        library.put(JSONObject().put("path", file.absolutePath).put("title", title).put("folder", ""))
+                        Prefs.saveLibrary(this, library)
+                        runOnUiThread {
+                            openUri(Uri.fromFile(file))
+                            toast("Текст сохранён в библиотеке")
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { toast("Не удалось сохранить: ${e.message}") }
+                    }
+                }.start()
+            }
+            .setNegativeButton("Отмена", null)
+            .show()
+    }
+
+    private fun paste() {
         val cm = getSystemService(ClipboardManager::class.java)
         val t = cm.primaryClip?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim()
