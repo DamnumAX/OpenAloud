@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -57,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private var touchStartX = 0f
     private var touchStartY = 0f
     private var controlsExpanded = true
+    private var pendingCenterTap: Runnable? = null
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -108,6 +110,7 @@ class MainActivity : AppCompatActivity() {
         }
         super.onCreate(b)
         setContentView(R.layout.activity_main)
+        if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reader_landscape", false)) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
         toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
         list = findViewById(R.id.list)
@@ -337,6 +340,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 16, 15, "Отступы текста")
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
+        menu.add(0, 19, 18, "Горизонтальный режим (альбомная ориентация)")
         return true
     }
 
@@ -364,6 +368,7 @@ class MainActivity : AppCompatActivity() {
             16 -> textLayoutDialog()
             17 -> chooseBackground.launch(arrayOf("image/*"))
             18 -> { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
+            19 -> { val land = resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE; requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; getSharedPreferences("p", MODE_PRIVATE).edit().putBoolean("reader_landscape", land).apply() }
         }
         return true
     }
