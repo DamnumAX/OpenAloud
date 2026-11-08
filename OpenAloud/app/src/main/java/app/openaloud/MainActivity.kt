@@ -421,7 +421,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(h: VH, pos: Int) {
             h.tv.text = Reader.sentences[pos]
-            h.tv.textSize = Prefs.fontSize(this).toFloat()
+            h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
             h.tv.setBackgroundColor(if (pos == Reader.index) 0x66FFC107 else Color.TRANSPARENT)
             h.tv.setOnClickListener {
                 val p = h.bindingAdapterPosition
