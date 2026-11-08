@@ -5,10 +5,14 @@
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
+    <View android:id="@+id/topFrame" android:layout_width="match_parent" android:layout_height="2dp" android:background="#51433B" />
+
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize" />
+
+    <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" android:progress="0" android:indeterminate="false" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/list"
@@ -54,5 +58,6 @@
         <Button android:id="@+id/nextCh" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#51433B" android:textColor="#FFFFFF"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="+ глава" android:textSize="12sp" />
-    </LinearLayout>
+        <View android:id="@+id/bottomFrame" android:layout_width="match_parent" android:layout_height="2dp" android:background="#51433B" />
+</LinearLayout>
 </LinearLayout>
