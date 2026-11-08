@@ -193,6 +193,8 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 5, 4, "Словарь замен")
         menu.add(0, 6, 5, "Голос и движок (системные)")
         menu.add(0, 7, 6, "Пауза между предложениями")
+        menu.add(0, 8, 7, "Добавить закладку")
+        menu.add(0, 9, 8, "Мои закладки")
         return true
     }
 
@@ -209,8 +211,64 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(Settings.ACTION_SETTINGS))
             }
             7 -> sentencePauseDialog()
+            8 -> saveBookmark()
+            9 -> bookmarksDialog()
         }
         return true
+    }
+
+    private fun saveBookmark() {
+        if (Reader.sentences.isEmpty()) {
+            toast("Сначала откройте документ")
+            return
+        }
+        Prefs.addBookmark(this, Reader.docId, Reader.title, Reader.index)
+        toast("Закладка сохранена")
+    }
+
+    private fun bookmarksDialog() {
+        val a = Prefs.bookmarks(this)
+        if (a.length() == 0) {
+            toast("Закладок пока нет")
+            return
+        }
+        val labels = ArrayList<String>()
+        for (i in 0 until a.length()) {
+            val item = a.optJSONObject(i) ?: continue
+            labels.add("${item.optString("title", "Документ")} — позиция ${item.optInt("index") + 1}")
+        }
+        AlertDialog.Builder(this).setTitle("Закладки")
+            .setItems(labels.toTypedArray()) { _, which ->
+                val item = a.optJSONObject(which) ?: return@setItems
+                val id = item.optString("id")
+                val index = item.optInt("index").coerceAtLeast(0)
+                if (id == Reader.docId) {
+                    Reader.index = index.coerceIn(0, (Reader.sentences.size - 1).coerceAtLeast(0))
+                    Reader.changed()
+                } else if (id.startsWith("content:") || id.startsWith("text:")) {
+                    toast("Эта закладка относится к тексту, который нужно открыть заново")
+                } else {
+                    Prefs.setPos(this, id, index)
+                    openUri(Uri.parse(id))
+                }
+            }
+            .setNeutralButton("Управление") { _, _ -> manageBookmarksDialog() }
+            .setNegativeButton("Закрыть", null).show()
+    }
+
+    private fun manageBookmarksDialog() {
+        val a = Prefs.bookmarks(this)
+        if (a.length() == 0) return
+        val labels = ArrayList<String>()
+        for (i in 0 until a.length()) {
+            val item = a.optJSONObject(i) ?: continue
+            labels.add("${item.optString("title", "Документ")} — ${item.optInt("index") + 1}")
+        }
+        AlertDialog.Builder(this).setTitle("Удалить закладку")
+            .setItems(labels.toTypedArray()) { _, which ->
+                Prefs.removeBookmark(this, which)
+                toast("Закладка удалена")
+            }.setNegativeButton("Отмена", null).show()
     }
 
     private fun paste() {
