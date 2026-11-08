@@ -394,6 +394,84 @@ class MainActivity : AppCompatActivity() {
             .setNegativeButton("Отмена", null).show()
     }
 
+
+    private fun voiceDialog() {
+        toast("Загружаю список голосов…")
+        lateinit var engine: TextToSpeech
+        engine = TextToSpeech(this) { status ->
+            if (status != TextToSpeech.SUCCESS) {
+                runOnUiThread { toast("Не удалось загрузить голоса") }
+                return@TextToSpeech
+            }
+            val voices = engine.voices?.sortedBy { it.name } ?: emptyList()
+            runOnUiThread {
+                if (voices.isEmpty()) {
+                    toast("Системные голоса не найдены")
+                    engine.shutdown()
+                    return@runOnUiThread
+                }
+                val labels = voices.map { it.name + " · " + it.locale.displayName }.toTypedArray()
+                val selected = voices.indexOfFirst { it.name == Prefs.voice(this) }.coerceAtLeast(0)
+                AlertDialog.Builder(this).setTitle("Голос чтения")
+                    .setSingleChoiceItems(labels, selected) { dialog, which ->
+                        Prefs.setVoice(this, voices[which].name)
+                        engine.shutdown()
+                        dialog.dismiss()
+                        toast("Голос выбран. Изменение применится при следующей фразе.")
+                    }
+                    .setNeutralButton("Автоматический") { _, _ ->
+                        Prefs.setVoice(this, "")
+                        engine.shutdown()
+                    }
+                    .setNegativeButton("Закрыть") { _, _ -> engine.shutdown() }
+                    .setOnCancelListener { engine.shutdown() }.show()
+            }
+        }
+    }
+
+    private fun searchDialog() {
+        if (Reader.sentences.isEmpty()) { toast("Сначала откройте книгу"); return }
+        val input = EditText(this).apply { hint = "Слово или фраза" }
+        val dialog = AlertDialog.Builder(this).setTitle("Поиск по тексту")
+            .setView(input).setPositiveButton("Найти", null)
+            .setNegativeButton("Отмена", null).create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val query = input.text.toString().trim()
+                if (query.isEmpty()) { input.error = "Введите запрос"; return@setOnClickListener }
+                val matches = Reader.sentences.indices.filter { Reader.sentences[it].contains(query, true) }
+                if (matches.isEmpty()) { toast("Совпадений не найдено"); return@setOnClickListener }
+                val labels = matches.map { (it + 1).toString() + ". " + Reader.sentences[it].take(120) }.toTypedArray()
+                AlertDialog.Builder(this).setTitle("Найдено: " + matches.size)
+                    .setItems(labels) { _, which -> jumpTo(matches[which]) }
+                    .setNegativeButton("Закрыть", null).show()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun jumpTo(index: Int) {
+        Reader.index = index.coerceIn(0, (Reader.sentences.size - 1).coerceAtLeast(0))
+        if (Reader.docId.isNotEmpty()) Prefs.setPos(this, Reader.docId, Reader.index)
+        Reader.changed()
+    }
+
+    private fun textLayoutDialog() {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(40, 24, 40, 0)
+        }
+        sliderRow(box, "Боковые отступы", 48, Prefs.sidePadding(this) / 2,
+            { (it * 2).toString() + " dp" }) {
+            Prefs.setSidePadding(this, it * 2)
+            adapter.notifyDataSetChanged()
+        }
+        AlertDialog.Builder(this).setTitle("Ширина текстовой колонки")
+            .setMessage("Сведите или разведите два пальца на тексте, чтобы изменить размер шрифта. Полоса прокрутки находится справа.")
+            .setView(box).setPositiveButton("Готово", null).show()
+    }
+
     private fun historyDialog() {
         val a = Prefs.history(this)
         if (a.length() == 0) {
