@@ -34,6 +34,13 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content" />
 
+    <SeekBar
+        android:id="@+id/browseSeek"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:contentDescription="Быстрый просмотр текста без изменения чтения" />
+
     <LinearLayout
         android:id="@+id/controlBar"
         android:layout_width="match_parent"
