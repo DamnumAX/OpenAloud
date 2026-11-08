@@ -8,6 +8,8 @@
 
     <application
         android:label="@string/app_name"
+        android:icon="@drawable/openaloud_icon"
+        android:roundIcon="@drawable/openaloud_icon"
         android:theme="@style/Theme.OpenAloud"
         android:usesCleartextTraffic="true">
 
