@@ -425,7 +425,7 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Управление книгами")
             .setItems(books.map { it.optString("title") }.toTypedArray()) { _, which ->
                 val b = books[which]
-                val actions = arrayOf("Переименовать", "Переместить в папку", "Удалить из библиотеки")
+                val actions = arrayOf("Переименовать", "Переместить в папку", "Удалить из библиотеки", "Переместить выше", "Переместить ниже")
                 AlertDialog.Builder(this).setTitle(b.optString("title")).setItems(actions) { _, action ->
                     when (action) {
                         0 -> {
@@ -447,6 +447,19 @@ class MainActivity : AppCompatActivity() {
                                     b.put("folder", if (index == 0) "" else choices[index])
                                     saveBook(b); libraryDialog()
                                 }.show()
+                        }
+                        3, 4 -> {
+                            val all = Prefs.library(this)
+                            var index = -1
+                            for (i in 0 until all.length()) if (all.optJSONObject(i)?.optString("path") == b.optString("path")) { index = i; break }
+                            val target = if (action == 3) index - 1 else index + 1
+                            if (index >= 0 && target in 0 until all.length()) {
+                                val other = all.get(target)
+                                all.put(target, all.get(index))
+                                all.put(index, other)
+                                Prefs.saveLibrary(this, all)
+                                libraryDialog()
+                            } else toast("Книга уже на краю списка")
                         }
                         2 -> AlertDialog.Builder(this).setTitle("Удалить сохранённый файл?")
                             .setMessage("Копия будет удалена из памяти приложения.")
