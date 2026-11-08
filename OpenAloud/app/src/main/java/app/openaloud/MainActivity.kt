@@ -55,6 +55,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: MaterialToolbar
     private lateinit var list: RecyclerView
     private lateinit var seek: SeekBar
+    private lateinit var browseSeek: SeekBar
+    private lateinit var miniProgress: ProgressBar
+    private lateinit var topFrame: View
+    private lateinit var bottomFrame: View
     private lateinit var playBtn: Button
     private lateinit var controlBar: ViewGroup
     private lateinit var expandControls: Button
@@ -165,6 +169,16 @@ class MainActivity : AppCompatActivity() {
         }
         applyReaderBackground()
         seek = findViewById(R.id.seek)
+        browseSeek = findViewById(R.id.browseSeek)
+        miniProgress = findViewById(R.id.miniProgress)
+        topFrame = findViewById(R.id.topFrame)
+        bottomFrame = findViewById(R.id.bottomFrame)
+        applyFrameColors()
+        browseSeek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, value: Int, fromUser: Boolean) {}
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) { previewPosition(browseSeek.progress) }
+        })
         playBtn = findViewById(R.id.play)
         controlBar = findViewById(R.id.controlBar)
         expandControls = findViewById(R.id.expandControls)
@@ -284,6 +298,9 @@ class MainActivity : AppCompatActivity() {
         controlsExpanded = expanded
         controlBar.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
         seek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+        browseSeek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+        toolbar.title = if (expanded) Reader.title.ifEmpty { getString(R.string.app_name) } else ""
+        toolbar.subtitle = if (expanded) toolbarSubtitle() else ""
         expandControls.text = if (expanded) "⌄" else "⌃"
     }
 
@@ -396,7 +413,7 @@ class MainActivity : AppCompatActivity() {
         val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
         val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
         val progressPercent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
-        toolbar.subtitle = if (Reader.sentences.isEmpty()) "" else "$progressPercent% прочитано • осталось примерно $minutesLeft мин."
+        toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""\n        miniProgress.max = 100\n        miniProgress.progress = progressPercent\n        if (browseSeek.max != max(1, Reader.sentences.size - 1)) browseSeek.max = max(1, Reader.sentences.size - 1)\n        if (!browseSeek.isPressed) browseSeek.progress = Reader.index
         playBtn.text = if (Reader.playing) "⏸" else "▶"
         if (!seeking) {
             seek.max = max(1, Reader.sentences.size - 1)
@@ -404,7 +421,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun cmd(action: String, index: Int = -1) {
+    private fun toolbarSubtitle(): String {\n        if (Reader.sentences.isEmpty()) return ""\n        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }\n        val cps = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)\n        val mins = (remainingChars / cps / 60.0).roundToInt()\n        val pct = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()\n        return "$pct% прочитано • осталось примерно $mins мин."\n    }\n\n    private fun previewPosition(index: Int) {\n        if (Reader.sentences.isEmpty()) return\n        val target = index.coerceIn(0, Reader.sentences.lastIndex)\n        if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)) {\n            val page = bookPages.indexOfFirst { target in it }.coerceAtLeast(0)\n            list.smoothScrollToPosition(page)\n        } else list.smoothScrollToPosition(target)\n    }\n\n    private fun applyFrameColors() {\n        val p = getSharedPreferences("p", MODE_PRIVATE)\n        topFrame.setBackgroundColor(p.getInt("frame_top", 0xFF51433B.toInt()))\n        bottomFrame.setBackgroundColor(p.getInt("frame_bottom", 0xFF51433B.toInt()))\n    }\n\n    private fun frameColorsDialog() {\n        val colors = intArrayOf(0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(), 0xFF4CAF50.toInt(), 0xFFE91E63.toInt())\n        val names = arrayOf("Тёмный", "Коричневый", "Золотистый", "Чёрный", "Белый", "Сине-серый", "Зелёный", "Розовый")\n        fun choose(key: String, label: String) {\n            val current = getSharedPreferences("p", MODE_PRIVATE).getInt(key, colors[1])\n            val selected = colors.indexOf(current).coerceAtLeast(0)\n            AlertDialog.Builder(this).setTitle(label).setSingleChoiceItems(names, selected) { d, which ->\n                getSharedPreferences("p", MODE_PRIVATE).edit().putInt(key, colors[which]).apply(); applyFrameColors(); d.dismiss()\n            }.setNegativeButton("Отмена", null).show()\n        }\n        AlertDialog.Builder(this).setTitle("Цвет рамок")\n            .setItems(arrayOf("Верхняя рамка", "Нижняя рамка")) { _, which -> choose(if (which == 0) "frame_top" else "frame_bottom", if (which == 0) "Верхняя рамка" else "Нижняя рамка") }\n            .setNegativeButton("Готово", null).show()\n    }\n\n    private fun cmd(action: String, index: Int = -1) {
         val i = Intent(this, TtsService::class.java).setAction(action)
         if (index >= 0) i.putExtra("index", index)
         if (action == TtsService.PLAY || action == TtsService.SEEK_PLAY)
@@ -434,7 +451,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
         menu.add(0, 19, 18, "Ориентация экрана")
-        menu.add(0, 20, 19, "Режим чтения: книга / свиток")
+        menu.add(0, 20, 19, "Режим чтения: книга / свиток")\n        menu.add(0, 21, 20, "Вставить / создать текст")\n        menu.add(0, 22, 21, "Цвет верхней и нижней рамки")
         return true
     }
 
@@ -463,7 +480,7 @@ class MainActivity : AppCompatActivity() {
             17 -> chooseBackground.launch(arrayOf("image/*"))
             18 -> { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
             19 -> { val land = resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE; requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; getSharedPreferences("p", MODE_PRIVATE).edit().putBoolean("reader_landscape", land).apply() }
-            20 -> readingModeDialog()
+            20 -> readingModeDialog()\n            21 -> createTextDialog()\n            22 -> frameColorsDialog()
         }
         return true
     }
@@ -885,7 +902,7 @@ class MainActivity : AppCompatActivity() {
             }.setNegativeButton("Отмена", null).show()
     }
 
-    private fun paste() {
+    private fun createTextDialog() {\n        val edit = EditText(this).apply { hint = "Вставьте или напишите текст здесь"; minLines = 8; gravity = android.view.Gravity.TOP }\n        val name = EditText(this).apply { hint = "Название текста" }\n        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 8, 24, 0); addView(name); addView(edit, LinearLayout.LayoutParams(-1, 0, 1f)) }\n        val cm = getSystemService(ClipboardManager::class.java)\n        cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()?.let { edit.setText(it) }\n        AlertDialog.Builder(this).setTitle("Новый текст") .setView(box)\n            .setPositiveButton("Сохранить в библиотеку и открыть") { _, _ ->\n                val text = edit.text.toString().trim(); if (text.isEmpty()) { toast("Текст пустой"); return@setPositiveButton }\n                val title = name.text.toString().trim().ifBlank { "Мой текст" }\n                Thread { try {\n                    val dir = File(filesDir, "library").apply { mkdirs() }; val safe = title.replace(Regex("[^A-Za-z0-9А-Яа-я._-]"), "_").take(70)\n                    var file = File(dir, "$safe.txt"); var n = 1; while (file.exists()) file = File(dir, "${safe}_${n++}.txt")\n                    file.writeText(text, Charsets.UTF_8)\n                    val a = Prefs.library(this); a.put(JSONObject().put("path", file.absolutePath).put("title", title).put("folder", "")); Prefs.saveLibrary(this, a)\n                    runOnUiThread { openUri(Uri.fromFile(file)); toast("Текст сохранён в библиотеке") }\n                } catch (e: Exception) { runOnUiThread { toast("Не удалось сохранить: ${e.message}") } } }.start()\n            }.setNegativeButton("Отмена", null).show()\n    }\n\n    private fun paste() {
         val cm = getSystemService(ClipboardManager::class.java)
         val t = cm.primaryClip?.takeIf { it.itemCount > 0 }
             ?.getItemAt(0)?.coerceToText(this)?.toString()?.trim()
@@ -987,7 +1004,7 @@ class MainActivity : AppCompatActivity() {
             if (activePart >= 0) {
                 val start = starts[activePart]
                 val end = start + parts[activePart].length
-                styled.setSpan(BackgroundColorSpan(0x66FFC107), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                styled.setSpan(BackgroundColorSpan(0xCCFFC107.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             h.tv.text = styled
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
