@@ -413,7 +413,11 @@ class MainActivity : AppCompatActivity() {
         val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
         val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
         val progressPercent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
-        toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""\n        miniProgress.max = 100\n        miniProgress.progress = progressPercent\n        if (browseSeek.max != max(1, Reader.sentences.size - 1)) browseSeek.max = max(1, Reader.sentences.size - 1)\n        if (!browseSeek.isPressed) browseSeek.progress = Reader.index
+        toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""
+        miniProgress.max = 100
+        miniProgress.progress = progressPercent
+        if (browseSeek.max != max(1, Reader.sentences.size - 1)) browseSeek.max = max(1, Reader.sentences.size - 1)
+        if (!browseSeek.isPressed) browseSeek.progress = Reader.index
         playBtn.text = if (Reader.playing) "⏸" else "▶"
         if (!seeking) {
             seek.max = max(1, Reader.sentences.size - 1)
@@ -421,7 +425,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun toolbarSubtitle(): String {\n        if (Reader.sentences.isEmpty()) return ""\n        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }\n        val cps = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)\n        val mins = (remainingChars / cps / 60.0).roundToInt()\n        val pct = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()\n        return "$pct% прочитано • осталось примерно $mins мин."\n    }\n\n    private fun previewPosition(index: Int) {\n        if (Reader.sentences.isEmpty()) return\n        val target = index.coerceIn(0, Reader.sentences.lastIndex)\n        if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)) {\n            val page = bookPages.indexOfFirst { target in it }.coerceAtLeast(0)\n            list.smoothScrollToPosition(page)\n        } else list.smoothScrollToPosition(target)\n    }\n\n    private fun applyFrameColors() {\n        val p = getSharedPreferences("p", MODE_PRIVATE)\n        topFrame.setBackgroundColor(p.getInt("frame_top", 0xFF51433B.toInt()))\n        bottomFrame.setBackgroundColor(p.getInt("frame_bottom", 0xFF51433B.toInt()))\n    }\n\n    private fun frameColorsDialog() {\n        val colors = intArrayOf(0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(), 0xFF4CAF50.toInt(), 0xFFE91E63.toInt())\n        val names = arrayOf("Тёмный", "Коричневый", "Золотистый", "Чёрный", "Белый", "Сине-серый", "Зелёный", "Розовый")\n        fun choose(key: String, label: String) {\n            val current = getSharedPreferences("p", MODE_PRIVATE).getInt(key, colors[1])\n            val selected = colors.indexOf(current).coerceAtLeast(0)\n            AlertDialog.Builder(this).setTitle(label).setSingleChoiceItems(names, selected) { d, which ->\n                getSharedPreferences("p", MODE_PRIVATE).edit().putInt(key, colors[which]).apply(); applyFrameColors(); d.dismiss()\n            }.setNegativeButton("Отмена", null).show()\n        }\n        AlertDialog.Builder(this).setTitle("Цвет рамок")\n            .setItems(arrayOf("Верхняя рамка", "Нижняя рамка")) { _, which -> choose(if (which == 0) "frame_top" else "frame_bottom", if (which == 0) "Верхняя рамка" else "Нижняя рамка") }\n            .setNegativeButton("Готово", null).show()\n    }\n\n    private fun cmd(action: String, index: Int = -1) {
+    private fun toolbarSubtitle(): String {
+        if (Reader.sentences.isEmpty()) return ""
+        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }
+        val cps = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
+        val mins = (remainingChars / cps / 60.0).roundToInt()
+        val pct = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
+        return "$pct% прочитано • осталось примерно $mins мин."
+    }\n
+    private fun previewPosition(index: Int) {
+        if (Reader.sentences.isEmpty()) return
+        val target = index.coerceIn(0, Reader.sentences.lastIndex)
+        if (getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)) {
+            val page = bookPages.indexOfFirst { target in it }.coerceAtLeast(0)
+            list.smoothScrollToPosition(page)
+        } else list.smoothScrollToPosition(target)
+    }\n
+    private fun applyFrameColors() {
+        val p = getSharedPreferences("p", MODE_PRIVATE)
+        topFrame.setBackgroundColor(p.getInt("frame_top", 0xFF51433B.toInt()))
+        bottomFrame.setBackgroundColor(p.getInt("frame_bottom", 0xFF51433B.toInt()))
+    }\n
+    private fun frameColorsDialog() {
+        val colors = intArrayOf(0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(), 0xFF4CAF50.toInt(), 0xFFE91E63.toInt())
+        val names = arrayOf("Тёмный", "Коричневый", "Золотистый", "Чёрный", "Белый", "Сине-серый", "Зелёный", "Розовый")
+        fun choose(key: String, label: String) {
+            val current = getSharedPreferences("p", MODE_PRIVATE).getInt(key, colors[1])
+            val selected = colors.indexOf(current).coerceAtLeast(0)
+            AlertDialog.Builder(this).setTitle(label).setSingleChoiceItems(names, selected) { d, which ->
+                getSharedPreferences("p", MODE_PRIVATE).edit().putInt(key, colors[which]).apply(); applyFrameColors(); d.dismiss()
+            }.setNegativeButton("Отмена", null).show()
+        }
+        AlertDialog.Builder(this).setTitle("Цвет рамок")
+            .setItems(arrayOf("Верхняя рамка", "Нижняя рамка")) { _, which -> choose(if (which == 0) "frame_top" else "frame_bottom", if (which == 0) "Верхняя рамка" else "Нижняя рамка") }
+            .setNegativeButton("Готово", null).show()
+    }\n
+    private fun cmd(action: String, index: Int = -1) {
         val i = Intent(this, TtsService::class.java).setAction(action)
         if (index >= 0) i.putExtra("index", index)
         if (action == TtsService.PLAY || action == TtsService.SEEK_PLAY)
@@ -451,7 +490,9 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
         menu.add(0, 19, 18, "Ориентация экрана")
-        menu.add(0, 20, 19, "Режим чтения: книга / свиток")\n        menu.add(0, 21, 20, "Вставить / создать текст")\n        menu.add(0, 22, 21, "Цвет верхней и нижней рамки")
+        menu.add(0, 20, 19, "Режим чтения: книга / свиток")
+        menu.add(0, 21, 20, "Вставить / создать текст")
+        menu.add(0, 22, 21, "Цвет верхней и нижней рамки")
         return true
     }
 
@@ -480,7 +521,9 @@ class MainActivity : AppCompatActivity() {
             17 -> chooseBackground.launch(arrayOf("image/*"))
             18 -> { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
             19 -> { val land = resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE; requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; getSharedPreferences("p", MODE_PRIVATE).edit().putBoolean("reader_landscape", land).apply() }
-            20 -> readingModeDialog()\n            21 -> createTextDialog()\n            22 -> frameColorsDialog()
+            20 -> readingModeDialog()
+            21 -> createTextDialog()
+            22 -> frameColorsDialog()
         }
         return true
     }
