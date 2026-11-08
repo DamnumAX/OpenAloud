@@ -185,7 +185,12 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
             pause()
             return
         }
-        if (spokenLocale != Reader.locale) {
+        val preferredVoice = Prefs.voice(this)
+        val selectedVoice = t.voices?.firstOrNull { it.name == preferredVoice }
+        if (selectedVoice != null) {
+            t.voice = selectedVoice
+            spokenLocale = selectedVoice.locale
+        } else if (spokenLocale != Reader.locale) {
             t.language = Reader.locale
             spokenLocale = Reader.locale
         }
