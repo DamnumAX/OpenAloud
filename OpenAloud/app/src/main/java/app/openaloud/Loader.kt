@@ -206,11 +206,11 @@ object Loader {
             }
         }
         val xml = documentXml ?: error("В DOCX не найден основной текст")
-        val text = xml.replace(Regex("(?i)</w:p\\s*>"), "\\n")
-            .replace(Regex("(?i)<w:tab\\b[^>]*/>"), "\\t")
+        val text = xml.replace(Regex("(?i)</w:p\\s*>"), "\n")
+            .replace(Regex("(?i)<w:tab\\b[^>]*/>"), "\t")
             .replace(Regex("(?is)<[^>]+>"), "")
         return HtmlCompat.fromHtml(text, HtmlCompat.FROM_HTML_MODE_LEGACY)
-            .toString().replace("\\u00A0", " ").trim()
+            .toString().replace("\u00A0", " ").trim()
     }
 
     private fun epub(ctx: Context, uri: Uri): List<String> {
@@ -255,7 +255,7 @@ object Loader {
         repeat(3) { cleaned = cleaned.replace(noisy, "") }
         cleaned = cleaned
             .replace(Regex("(?is)<(header|nav|footer)\\b.*?</\\1>"), "")
-            .replace(Regex("(?i)<br\\s*/?>|</p>|</div>|</h[1-6]>|</li>|</tr>"), "\\n")
+            .replace(Regex("(?i)<br\\s*/?>|</p>|</div>|</h[1-6]>|</li>|</tr>"), "\n")
         return HtmlCompat.fromHtml(cleaned, HtmlCompat.FROM_HTML_MODE_LEGACY)
             .toString().replace("\uFFFC", "").replace(Regex("[\\t ]+"), " ")
             .replace(Regex(" *\\n *"), "\n").trim()
