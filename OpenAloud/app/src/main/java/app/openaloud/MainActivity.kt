@@ -130,42 +130,18 @@ class MainActivity : AppCompatActivity() {
             }
         })
         list.setOnTouchListener { rv, event ->
-            scaleDetector.onTouchEvent(event)
-            if (event.action == MotionEvent.ACTION_DOWN) { touchStartX = event.x; touchStartY = event.y; false }
-            else if (event.action == MotionEvent.ACTION_UP) {
-                if (kotlin.math.abs(event.x - touchStartX) > 90 && kotlin.math.abs(event.x - touchStartX) > kotlin.math.abs(event.y - touchStartY)) {
-                    pageBy(if (event.x < touchStartX) 1 else -1)
-                    lastTapAt = 0L
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                touchStartX = event.x
+                touchStartY = event.y
+            } else if (event.action == MotionEvent.ACTION_UP) {
+                val dx = event.x - touchStartX
+                val dy = event.y - touchStartY
+                if (kotlin.math.abs(dx) > 110 && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
+                    pageBy(if (dx < 0) 1 else -1)
                     return@setOnTouchListener true
                 }
-                val now = android.os.SystemClock.uptimeMillis()
-                val recycler = rv as RecyclerView
-                val child = recycler.findChildViewUnder(event.x, event.y)
-                val position = if (child == null) RecyclerView.NO_POSITION else recycler.getChildAdapterPosition(child)
-                if (position != RecyclerView.NO_POSITION && position == lastTapPosition && now - lastTapAt in 1..350) {
-                    pendingCenterTap?.let { rv.removeCallbacks(it) }
-                    pendingCenterTap = null
-                    cmd(TtsService.SEEK_PLAY, position)
-                    lastTapAt = 0L
-                    true
-                } else {
-                    lastTapAt = now
-                    lastTapPosition = position
-                    if (event.x in (rv.width * 0.35f)..(rv.width * 0.65f)) {
-                        if (position == RecyclerView.NO_POSITION) setControlsExpanded(!controlsExpanded)
-                        else {
-                            pendingCenterTap?.let { rv.removeCallbacks(it) }
-                            val action = Runnable { setControlsExpanded(!controlsExpanded); pendingCenterTap = null }
-                            pendingCenterTap = action
-                            rv.postDelayed(action, 360L)
-                        }
-                    } else if (position == RecyclerView.NO_POSITION) {
-                        if (event.x < rv.width * 0.3f) pageBy(-1)
-                        else if (event.x > rv.width * 0.7f) pageBy(1)
-                    }
-                    false
-                }
-            } else false
+            }
+            false
         }
         applyReaderBackground()
         seek = findViewById(R.id.seek)
@@ -182,14 +158,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.next).setOnClickListener { cmd(TtsService.NEXT) }
         findViewById<Button>(R.id.prevCh).setOnClickListener { cmd(TtsService.PREV_CH) }
         findViewById<Button>(R.id.nextCh).setOnClickListener { cmd(TtsService.NEXT_CH) }
-        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {}
-            override fun onStartTrackingTouch(s: SeekBar?) { seeking = true }
-            override fun onStopTrackingTouch(s: SeekBar?) {
-                seeking = false
-                cmd(TtsService.SEEK, seek.progress)
-            }
-        })
+        // Индикатор прогресса только показывает позицию озвучки.
+        // Ручная прокрутка текста не меняет место чтения.
+        seek.isEnabled = false
 
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
@@ -313,6 +284,11 @@ class MainActivity : AppCompatActivity() {
         }
         shownIndex = Reader.index
         toolbar.title = Reader.title.ifEmpty { getString(R.string.app_name) }
+        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }
+        val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
+        val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
+        val progressPercent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
+        toolbar.subtitle = if (Reader.sentences.isEmpty()) "" else "$progressPercent% прочитано • осталось примерно $minutesLeft мин."
         playBtn.text = if (Reader.playing) "⏸" else "▶"
         if (!seeking) {
             seek.max = max(1, Reader.sentences.size - 1)
@@ -349,7 +325,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 16, 15, "Отступы текста")
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
-        menu.add(0, 19, 18, "Горизонтальный режим (альбомная ориентация)")
+        menu.add(0, 19, 18, "Ориентация экрана")
         return true
     }
 
