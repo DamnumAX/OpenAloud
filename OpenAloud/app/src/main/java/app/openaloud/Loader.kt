@@ -212,13 +212,13 @@ object Loader {
             .replace(Regex("(?is)<head\\b.*?</head>"), "")
             .replace(Regex("(?is)<(script|style|nav|footer|aside|noscript|form|button|svg)\\b.*?</\\1>"), "")
         // Убираем типичные рекламные, навигационные и комментарийные контейнеры.
-        val noisy = Regex("(?is)<(div|section|aside|ul|ol)\\b(?=[^>]*(?:class|id)\\s*=\\s*[\"'][^\"']*(?:ad[-_ ]?|advert|banner|promo|cookie|popup|modal|comment|disqus|social|share|sidebar|navigation|\bmenu\b)[^\"']*[\"'])[^>]*>.*?</\\1>")
+        val noisy = Regex("(?is)<(div|section|aside|ul|ol)\\b(?=[^>]*(?:class|id)\\s*=\\s*[\"'][^\"']*(?:ad[-_ ]?|advert|banner|promo|cookie|popup|modal|comment|disqus|social|share|sidebar|navigation|\\bmenu\\b)[^\"']*[\"'])[^>]*>.*?</\\1>")
         repeat(3) { cleaned = cleaned.replace(noisy, "") }
         cleaned = cleaned
             .replace(Regex("(?is)<(header|nav|footer)\\b.*?</\\1>"), "")
             .replace(Regex("(?i)<br\\s*/?>|</p>|</div>|</h[1-6]>|</li>|</tr>"), "\\n")
         return HtmlCompat.fromHtml(cleaned, HtmlCompat.FROM_HTML_MODE_LEGACY)
-            .toString().replace("\\uFFFC", "").replace(Regex("[\\t ]+"), " ")
-            .replace(Regex(" *\\n *"), "\\n").trim()
+            .toString().replace("\uFFFC", "").replace(Regex("[\\t ]+"), " ")
+            .replace(Regex(" *\\n *"), "\n").trim()
     }
 }
