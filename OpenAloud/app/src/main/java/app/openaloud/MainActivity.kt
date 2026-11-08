@@ -53,6 +53,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(b: Bundle?) {
         applySavedTheme()
+        when (Prefs.theme(this)) {
+            3 -> setTheme(R.style.Theme_OpenAloud_Gold)
+            4 -> setTheme(R.style.Theme_OpenAloud_Brown)
+        }
         super.onCreate(b)
         setContentView(R.layout.activity_main)
         toolbar = findViewById(R.id.toolbar)
@@ -259,7 +263,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun themeDialog() {
-        val labels = arrayOf("Как в системе", "Светлая", "Тёмная")
+        val labels = arrayOf("Как в системе", "Светлая", "Тёмная", "Золотая", "Коричневая")
         AlertDialog.Builder(this).setTitle("Тема оформления")
             .setSingleChoiceItems(labels, Prefs.theme(this)) { dialog, which ->
                 Prefs.setTheme(this, which)
@@ -272,7 +276,8 @@ class MainActivity : AppCompatActivity() {
     private fun applySavedTheme() {
         val mode = when (Prefs.theme(this)) {
             1 -> AppCompatDelegate.MODE_NIGHT_NO
-            2 -> AppCompatDelegate.MODE_NIGHT_YES
+            2, 4 -> AppCompatDelegate.MODE_NIGHT_YES
+            3 -> AppCompatDelegate.MODE_NIGHT_NO
             else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
         }
         AppCompatDelegate.setDefaultNightMode(mode)
