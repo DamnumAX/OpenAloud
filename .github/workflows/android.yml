@@ -30,6 +30,16 @@ jobs:
           unzip -q OpenAloud.zip -d .
           test -f OpenAloud/app/build.gradle.kts
 
+      - name: Package extracted source for inspection
+        run: zip -qr OpenAloud-source.zip OpenAloud
+
+      - name: Upload extracted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenAloud-source
+          path: OpenAloud-source.zip
+          retention-days: 1
+
       - name: Set up Gradle
         uses: gradle/gradle-build-action@v3
         with:
