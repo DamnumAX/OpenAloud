@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.net.Uri
+import java.io.File
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -172,6 +174,32 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
         if (target in ch.indices) seek(ch[target])
     }
 
+    private fun openNextLibraryBook(): Boolean {
+        val a = Prefs.library(this)
+        var currentIndex = -1
+        for (i in 0 until a.length()) {
+            val item = a.optJSONObject(i) ?: continue
+            if (Uri.fromFile(File(item.optString("path"))).toString() == Reader.docId) {
+                currentIndex = i
+                break
+            }
+        }
+        if (currentIndex < 0 || currentIndex + 1 >= a.length()) return false
+        val next = a.optJSONObject(currentIndex + 1) ?: return false
+        val file = File(next.optString("path"))
+        if (!file.exists()) return false
+        return try {
+            val doc = Loader.fromUri(this, Uri.fromFile(file))
+            Reader.docId = doc.id
+            Reader.title = next.optString("title", doc.title)
+            Reader.sentences = doc.sentences
+            Reader.chapters = doc.chapters
+            Reader.locale = doc.locale
+            Reader.index = Prefs.pos(this, doc.id).coerceIn(0, (doc.sentences.size - 1).coerceAtLeast(0))
+            true
+        } catch (_: Exception) { false }
+    }
+
     private fun save() {
         if (Reader.docId.isNotEmpty()) Prefs.setPos(this, Reader.docId, Reader.index)
     }
@@ -181,9 +209,13 @@ class TtsService : Service(), TextToSpeech.OnInitListener {
     private fun speakCurrent() {
         val t = tts ?: return
         if (!ready || Reader.sentences.isEmpty()) return
-        if (Reader.index >= Reader.sentences.size) {   // конец текста
-            pause()
-            return
+        if (Reader.index >= Reader.sentences.size) {
+            if (Prefs.autoNext(this) && openNextLibraryBook()) {
+                Reader.changed()
+            } else {
+                pause()
+                return
+            }
         }
         val preferredVoice = Prefs.voice(this)
         val selectedVoice = t.voices?.firstOrNull { it.name == preferredVoice }
