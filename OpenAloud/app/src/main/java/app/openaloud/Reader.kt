@@ -30,4 +30,26 @@ object Prefs {
     fun setPos(c: Context, id: String, i: Int) = sp(c).edit().putInt("pos_$id", i).apply()
     fun lastUri(c: Context): String? = sp(c).getString("last", null)
     fun setLastUri(c: Context, u: String?) = sp(c).edit().putString("last", u).apply()
+    fun addBookmark(c: Context, id: String, title: String, index: Int) {
+        val a = org.json.JSONArray(sp(c).getString("bookmarks", "[]") ?: "[]")
+        val item = org.json.JSONObject().put("id", id).put("title", title).put("index", index)
+        var replaced = false
+        for (i in 0 until a.length()) {
+            val x = a.optJSONObject(i) ?: continue
+            if (x.optString("id") == id && x.optInt("index") == index) {
+                a.put(i, item); replaced = true; break
+            }
+        }
+        if (!replaced) a.put(item)
+        sp(c).edit().putString("bookmarks", a.toString()).apply()
+    }
+    fun bookmarks(c: Context): org.json.JSONArray =
+        org.json.JSONArray(sp(c).getString("bookmarks", "[]") ?: "[]")
+    fun removeBookmark(c: Context, index: Int) {
+        val a = bookmarks(c)
+        if (index in 0 until a.length()) {
+            a.remove(index)
+            sp(c).edit().putString("bookmarks", a.toString()).apply()
+        }
+    }
 }
