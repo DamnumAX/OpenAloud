@@ -1,0 +1,31 @@
+package app.openaloud
+
+import android.content.Context
+import java.util.Locale
+
+/** Общее состояние: текущий документ и позиция. Меняется только в главном потоке. */
+object Reader {
+    var docId = ""
+    var title = ""
+    var sentences: List<String> = emptyList()
+    var chapters: List<Int> = listOf(0)   // индексы предложений, с которых начинаются главы
+    var index = 0
+    var playing = false
+    var locale: Locale = Locale.US
+    var onChange: (() -> Unit)? = null
+    fun changed() { onChange?.invoke() }
+}
+
+object Prefs {
+    private fun sp(c: Context) = c.getSharedPreferences("p", Context.MODE_PRIVATE)
+    fun rate(c: Context) = sp(c).getFloat("rate", 1f)
+    fun pitch(c: Context) = sp(c).getFloat("pitch", 1f)
+    fun setRate(c: Context, v: Float) = sp(c).edit().putFloat("rate", v).apply()
+    fun setPitch(c: Context, v: Float) = sp(c).edit().putFloat("pitch", v).apply()
+    fun dict(c: Context): String = sp(c).getString("dict", "") ?: ""
+    fun setDict(c: Context, v: String) = sp(c).edit().putString("dict", v).apply()
+    fun pos(c: Context, id: String) = sp(c).getInt("pos_$id", 0)
+    fun setPos(c: Context, id: String, i: Int) = sp(c).edit().putInt("pos_$id", i).apply()
+    fun lastUri(c: Context): String? = sp(c).getString("last", null)
+    fun setLastUri(c: Context, u: String?) = sp(c).edit().putString("last", u).apply()
+}
