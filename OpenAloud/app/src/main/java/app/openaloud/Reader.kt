@@ -20,6 +20,8 @@ object Prefs {
     private fun sp(c: Context) = c.getSharedPreferences("p", Context.MODE_PRIVATE)
     fun rate(c: Context) = sp(c).getFloat("rate", 1f)
     fun pitch(c: Context) = sp(c).getFloat("pitch", 1f)
+    fun voice(c: Context) = sp(c).getString("tts_voice", "") ?: ""
+    fun setVoice(c: Context, v: String) = sp(c).edit().putString("tts_voice", v).apply()
     fun setRate(c: Context, v: Float) = sp(c).edit().putFloat("rate", v).apply()
     fun setPitch(c: Context, v: Float) = sp(c).edit().putFloat("pitch", v).apply()
     fun sentencePause(c: Context) = sp(c).getInt("sentence_pause_ms", 250)
@@ -68,7 +70,7 @@ object Prefs {
     fun fontSize(c: Context) = sp(c).getInt("font_size", 18).coerceIn(14, 32)
     fun setFontSize(c: Context, v: Int) = sp(c).edit().putInt("font_size", v.coerceIn(14, 32)).apply()
     fun theme(c: Context) = sp(c).getInt("theme", 0)
-    fun setTheme(c: Context, v: Int) = sp(c).edit().putInt("theme", v.coerceIn(0, 2)).apply()
+    fun setTheme(c: Context, v: Int) = sp(c).edit().putInt("theme", v.coerceIn(0, 4)).apply()
     fun removeBookmark(c: Context, index: Int) {
         val a = bookmarks(c)
         if (index in 0 until a.length()) {
