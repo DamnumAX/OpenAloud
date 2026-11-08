@@ -289,10 +289,15 @@ class MainActivity : AppCompatActivity() {
         val folders = Prefs.folders(this)
         val names = ArrayList<String>()
         names.add("Все сохранённые книги")
+        names.add("Недавно открытые")
         for (i in 0 until folders.length()) names.add("Папка: " + folders.optString(i))
         AlertDialog.Builder(this).setTitle("Моя библиотека")
             .setItems(names.toTypedArray()) { _, which ->
-                showLibraryBooks(if (which == 0) "" else folders.optString(which - 1))
+                when (which) {
+                    0 -> showLibraryBooks("")
+                    1 -> historyDialog()
+                    else -> showLibraryBooks(folders.optString(which - 2))
+                }
             }
             .setPositiveButton("Добавить файл") { _, _ -> importBook.launch(arrayOf("*/*")) }
             .setNeutralButton("Управление папками") { _, _ -> foldersDialog() }
