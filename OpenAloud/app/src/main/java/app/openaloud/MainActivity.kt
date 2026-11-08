@@ -322,19 +322,42 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Управление книгами")
             .setItems(books.map { it.optString("title") }.toTypedArray()) { _, which ->
                 val b = books[which]
-                val edit = EditText(this).apply { setText(b.optString("title")) }
-                AlertDialog.Builder(this).setTitle("Название книги").setView(edit)
-                    .setPositiveButton("Сохранить") { _, _ ->
-                        b.put("title", edit.text.toString().trim())
-                        saveBook(b)
-                        libraryDialog()
+                val actions = arrayOf("Переименовать", "Переместить в папку", "Удалить из библиотеки")
+                AlertDialog.Builder(this).setTitle(b.optString("title")).setItems(actions) { _, action ->
+                    when (action) {
+                        0 -> {
+                            val edit = EditText(this).apply { setText(b.optString("title")) }
+                            AlertDialog.Builder(this).setTitle("Название книги").setView(edit)
+                                .setPositiveButton("Сохранить") { _, _ ->
+                                    b.put("title", edit.text.toString().trim().ifBlank { "Книга" })
+                                    saveBook(b); libraryDialog()
+                                }.setNegativeButton("Отмена", null).show()
+                        }
+                        1 -> {
+                            val folders = Prefs.folders(this)
+                            val choices = ArrayList<String>().apply {
+                                add("Без папки")
+                                for (i in 0 until folders.length()) add(folders.optString(i))
+                            }
+                            AlertDialog.Builder(this).setTitle("Переместить в папку")
+                                .setItems(choices.toTypedArray()) { _, index ->
+                                    b.put("folder", if (index == 0) "" else choices[index])
+                                    saveBook(b); libraryDialog()
+                                }.show()
+                        }
+                        2 -> AlertDialog.Builder(this).setTitle("Удалить сохранённый файл?")
+                            .setMessage("Копия будет удалена из памяти приложения.")
+                            .setPositiveButton("Удалить") { _, _ ->
+                                File(b.optString("path")).delete()
+                                val all = Prefs.library(this); val out = org.json.JSONArray()
+                                for (i in 0 until all.length()) {
+                                    val item = all.optJSONObject(i)
+                                    if (item?.optString("path") != b.optString("path")) out.put(all.get(i))
+                                }
+                                Prefs.saveLibrary(this, out); libraryDialog()
+                            }.setNegativeButton("Отмена", null).show()
                     }
-                    .setNeutralButton("Удалить") { _, _ ->
-                        File(b.optString("path")).delete()
-                        val all = Prefs.library(this); val out = org.json.JSONArray()
-                        for (i in 0 until all.length()) if (all.optJSONObject(i)?.optString("path") != b.optString("path")) out.put(all.get(i))
-                        Prefs.saveLibrary(this, out); libraryDialog()
-                    }.setNegativeButton("Отмена", null).show()
+                }.show()
             }.setNegativeButton("Назад", null).show()
     }
 
