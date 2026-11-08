@@ -138,8 +138,11 @@ class MainActivity : AppCompatActivity() {
             } else if (event.action == MotionEvent.ACTION_UP) {
                 val dx = event.x - touchStartX
                 val dy = event.y - touchStartY
-                if (kotlin.math.abs(dx) > 110 && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.3f) {
-                    pageBy(if (dx < 0) 1 else -1)
+                val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+                val horizontalTurn = bookMode && kotlin.math.abs(dx) > 90 && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.25f
+                val verticalTurn = !bookMode && kotlin.math.abs(dy) > 90 && kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.25f
+                if (horizontalTurn || verticalTurn) {
+                    pageBy(if ((if (bookMode) dx else dy) < 0) 1 else -1)
                     return@setOnTouchListener true
                 }
             }
@@ -259,6 +262,17 @@ class MainActivity : AppCompatActivity() {
         expandControls.text = if (expanded) "⌄" else "⌃"
     }
 
+    private fun readingModeDialog() {
+        val prefs = getSharedPreferences("p", MODE_PRIVATE)
+        val isBook = prefs.getBoolean("reading_mode_book", false)
+        AlertDialog.Builder(this).setTitle("Режим чтения")
+            .setSingleChoiceItems(arrayOf("Свиток — вертикальная прокрутка", "Книга — перелистывание влево и вправо"), if (isBook) 1 else 0) { dialog, which ->
+                prefs.edit().putBoolean("reading_mode_book", which == 1).apply()
+                toast(if (which == 1) "Режим книги включён: листайте текст влево и вправо" else "Режим свитка включён: прокручивайте текст вверх и вниз")
+                dialog.dismiss()
+            }.setNegativeButton("Закрыть", null).show()
+    }
+
     private fun pageBy(direction: Int) {
         val lm = list.layoutManager as LinearLayoutManager
         val first = lm.findFirstVisibleItemPosition().coerceAtLeast(0)
@@ -328,6 +342,7 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
         menu.add(0, 19, 18, "Ориентация экрана")
+        menu.add(0, 20, 19, "Режим чтения: книга / свиток")
         return true
     }
 
@@ -356,6 +371,7 @@ class MainActivity : AppCompatActivity() {
             17 -> chooseBackground.launch(arrayOf("image/*"))
             18 -> { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
             19 -> { val land = resources.configuration.orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE; requestedOrientation = if (land) ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT; getSharedPreferences("p", MODE_PRIVATE).edit().putBoolean("reader_landscape", land).apply() }
+            20 -> readingModeDialog()
         }
         return true
     }
