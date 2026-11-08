@@ -22,6 +22,8 @@ object Prefs {
     fun pitch(c: Context) = sp(c).getFloat("pitch", 1f)
     fun setRate(c: Context, v: Float) = sp(c).edit().putFloat("rate", v).apply()
     fun setPitch(c: Context, v: Float) = sp(c).edit().putFloat("pitch", v).apply()
+    fun sentencePause(c: Context) = sp(c).getInt("sentence_pause_ms", 250)
+    fun setSentencePause(c: Context, v: Int) = sp(c).edit().putInt("sentence_pause_ms", v.coerceIn(0, 3000)).apply()
     fun dict(c: Context): String = sp(c).getString("dict", "") ?: ""
     fun setDict(c: Context, v: String) = sp(c).edit().putString("dict", v).apply()
     fun pos(c: Context, id: String) = sp(c).getInt("pos_$id", 0)
