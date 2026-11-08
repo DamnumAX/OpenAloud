@@ -432,7 +432,8 @@ class MainActivity : AppCompatActivity() {
         val mins = (remainingChars / cps / 60.0).roundToInt()
         val pct = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
         return "$pct% прочитано • осталось примерно $mins мин."
-    }\n
+    }
+
     private fun previewPosition(index: Int) {
         if (Reader.sentences.isEmpty()) return
         val target = index.coerceIn(0, Reader.sentences.lastIndex)
@@ -440,12 +441,14 @@ class MainActivity : AppCompatActivity() {
             val page = bookPages.indexOfFirst { target in it }.coerceAtLeast(0)
             list.smoothScrollToPosition(page)
         } else list.smoothScrollToPosition(target)
-    }\n
+    }
+
     private fun applyFrameColors() {
         val p = getSharedPreferences("p", MODE_PRIVATE)
         topFrame.setBackgroundColor(p.getInt("frame_top", 0xFF51433B.toInt()))
         bottomFrame.setBackgroundColor(p.getInt("frame_bottom", 0xFF51433B.toInt()))
-    }\n
+    }
+
     private fun frameColorsDialog() {
         val colors = intArrayOf(0xFF211D25.toInt(), 0xFF51433B.toInt(), 0xFF8A6744.toInt(), 0xFF000000.toInt(), 0xFFFFFFFF.toInt(), 0xFF607D8B.toInt(), 0xFF4CAF50.toInt(), 0xFFE91E63.toInt())
         val names = arrayOf("Тёмный", "Коричневый", "Золотистый", "Чёрный", "Белый", "Сине-серый", "Зелёный", "Розовый")
@@ -459,7 +462,8 @@ class MainActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Цвет рамок")
             .setItems(arrayOf("Верхняя рамка", "Нижняя рамка")) { _, which -> choose(if (which == 0) "frame_top" else "frame_bottom", if (which == 0) "Верхняя рамка" else "Нижняя рамка") }
             .setNegativeButton("Готово", null).show()
-    }\n
+    }
+
     private fun cmd(action: String, index: Int = -1) {
         val i = Intent(this, TtsService::class.java).setAction(action)
         if (index >= 0) i.putExtra("index", index)
