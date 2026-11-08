@@ -1,0 +1,48 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'OpenAloud.zip'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract source archive
+        run: |
+          test -f OpenAloud.zip
+          unzip -q OpenAloud.zip -d .
+          test -f OpenAloud/app/build.gradle.kts
+
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        working-directory: OpenAloud
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenAloud-debug
+          path: OpenAloud/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
