@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     private var lastTapPosition = RecyclerView.NO_POSITION
     private var touchStartX = 0f
     private var touchStartY = 0f
+    private var controlsExpanded = true
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -159,13 +160,6 @@ class MainActivity : AppCompatActivity() {
         playBtn = findViewById(R.id.play)
         controlBar = findViewById(R.id.controlBar)
         expandControls = findViewById(R.id.expandControls)
-        var controlsExpanded = true
-        fun setControlsExpanded(expanded: Boolean) {
-            controlsExpanded = expanded
-            controlBar.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
-            seek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
-            expandControls.text = if (expanded) "⌄" else "⌃"
-        }
         expandControls.setOnClickListener { setControlsExpanded(!controlsExpanded) }
 
         playBtn.setOnClickListener {
@@ -272,6 +266,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------- интерфейс ----------
+
+    private fun setControlsExpanded(expanded: Boolean) {
+        controlsExpanded = expanded
+        controlBar.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+        seek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
+        expandControls.text = if (expanded) "⌄" else "⌃"
+    }
 
     private fun pageBy(direction: Int) {
         val lm = list.layoutManager as LinearLayoutManager
