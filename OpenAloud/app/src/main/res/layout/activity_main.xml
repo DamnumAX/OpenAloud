@@ -16,6 +16,15 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
+    <Button
+        android:id="@+id/expandControls"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:background="#211D25"
+        android:text="⌃"
+        android:textColor="#F0D7B0"
+        android:textSize="20sp" />
+
     <SeekBar
         android:id="@+id/seek"
         android:layout_width="match_parent"
