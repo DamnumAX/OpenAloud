@@ -93,6 +93,19 @@ class MainActivity : AppCompatActivity() {
         list = findViewById(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
+        list.isVerticalScrollBarEnabled = true
+        list.isScrollbarFadingEnabled = false
+        val scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                val next = (Prefs.fontSize(this@MainActivity) * detector.scaleFactor).roundToInt().coerceIn(14, 32)
+                if (next != Prefs.fontSize(this@MainActivity)) {
+                    Prefs.setFontSize(this@MainActivity, next)
+                    adapter.notifyDataSetChanged()
+                }
+                return true
+            }
+        })
+        list.setOnTouchListener { _, event -> scaleDetector.onTouchEvent(event); false }
         seek = findViewById(R.id.seek)
         playBtn = findViewById(R.id.play)
 
@@ -134,6 +147,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onStop() {
+        if (Reader.docId.isNotEmpty()) Prefs.setPos(this, Reader.docId, Reader.index)
         Reader.onChange = null
         super.onStop()
     }
@@ -176,6 +190,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyDoc(d: Doc, lastUri: String?) {
         if (d.sentences.isEmpty()) { toast("Текст не найден"); return }
+        if (Reader.docId.isNotEmpty()) Prefs.setPos(this, Reader.docId, Reader.index)
         if (Reader.playing) cmd(TtsService.PAUSE)
         Reader.docId = d.id
         Reader.title = d.title
@@ -237,6 +252,9 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 11, 10, "Размер текста")
         menu.add(0, 12, 11, "Тема оформления")
         menu.add(0, 13, 12, "Автопереход к следующей книге")
+        menu.add(0, 14, 13, "Выбрать голос")
+        menu.add(0, 15, 14, "Поиск по тексту")
+        menu.add(0, 16, 15, "Отступы текста")
         return true
     }
 
@@ -259,6 +277,9 @@ class MainActivity : AppCompatActivity() {
             11 -> fontSizeDialog()
             12 -> themeDialog()
             13 -> autoNextDialog()
+            14 -> voiceDialog()
+            15 -> searchDialog()
+            16 -> textLayoutDialog()
         }
         return true
     }
@@ -563,6 +584,9 @@ class MainActivity : AppCompatActivity() {
         override fun onBindViewHolder(h: VH, pos: Int) {
             h.tv.text = Reader.sentences[pos]
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
+            val pad = (Prefs.sidePadding(this@MainActivity) * resources.displayMetrics.density).roundToInt()
+            h.tv.setPadding(pad, (6 * resources.displayMetrics.density).roundToInt(), pad, (6 * resources.displayMetrics.density).roundToInt())
+            h.tv.setTextIsSelectable(true)
             h.tv.setBackgroundColor(if (pos == Reader.index) 0x66FFC107 else Color.TRANSPARENT)
             h.tv.setOnClickListener {
                 val p = h.bindingAdapterPosition
