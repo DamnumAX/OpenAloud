@@ -168,17 +168,17 @@ object Loader {
     private fun fb2ToText(xml: String): String {
         val bodies = Regex("(?is)<body\\b[^>]*>(.*?)</body>").findAll(xml)
             .map { it.groupValues[1] }.toList()
-        val source = (if (bodies.isEmpty()) xml else bodies.joinToString("\\n") )
+        val source = (if (bodies.isEmpty()) xml else bodies.joinToString("\n"))
             .replace(Regex("(?is)<binary\\b.*?</binary>"), "")
             .replace(Regex("(?is)<(p|v|subtitle|text-author|date|th|td)\\b[^>]*>"), "")
-            .replace(Regex("(?i)</(p|v|subtitle|text-author|date|th|td)\\s*>"), "\\n")
-            .replace(Regex("(?i)<empty-line\\b[^>]*/?>"), "\\n")
-            .replace(Regex("(?i)<br\\s*/?>"), "\\n")
+            .replace(Regex("(?i)</(p|v|subtitle|text-author|date|th|td)\\s*>"), "\n")
+            .replace(Regex("(?i)<empty-line\\b[^>]*/?>"), "\n")
+            .replace(Regex("(?i)<br\\s*/?>"), "\n")
             .replace(Regex("(?is)<[^>]+>"), "")
         return HtmlCompat.fromHtml(source, HtmlCompat.FROM_HTML_MODE_LEGACY)
-            .toString().replace("\\u00A0", " ")
+            .toString().replace("\u00A0", " ")
             .replace(Regex("[\\t ]+"), " ")
-            .replace(Regex(" *\\n *"), "\\n").trim()
+            .replace(Regex(" *\\n *"), "\n").trim()
     }
 
     private fun pdf(ctx: Context, uri: Uri): String {
