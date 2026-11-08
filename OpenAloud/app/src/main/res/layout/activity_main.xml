@@ -22,12 +22,15 @@
         android:layout_height="wrap_content" />
 
     <LinearLayout
+        android:id="@+id/controlBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:background="#211D25"
+        android:paddingVertical="6dp">
 
-        <Button android:id="@+id/prevCh" style="?android:attr/borderlessButtonStyle"
+        <Button android:id="@+id/prevCh" style="?android:attr/borderlessButtonStyle" android:textColor="#F0D7B0" android:backgroundTint="#51433B"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="− глава" android:textSize="12sp" />
         <Button android:id="@+id/prev" style="?android:attr/borderlessButtonStyle"
