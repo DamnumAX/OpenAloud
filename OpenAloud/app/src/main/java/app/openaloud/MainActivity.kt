@@ -20,6 +20,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -51,6 +52,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(b: Bundle?) {
+        applySavedTheme()
         super.onCreate(b)
         setContentView(R.layout.activity_main)
         toolbar = findViewById(R.id.toolbar)
@@ -149,7 +151,10 @@ class MainActivity : AppCompatActivity() {
         Reader.locale = d.locale
         Reader.index = Prefs.pos(this, d.id).coerceIn(0, d.sentences.size - 1)
         Reader.playing = false
-        if (lastUri != null) Prefs.setLastUri(this, lastUri)
+        if (lastUri != null) {
+            Prefs.setLastUri(this, lastUri)
+            Prefs.addHistory(this, lastUri, d.title)
+        }
         Reader.changed()
     }
 
@@ -195,6 +200,9 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 7, 6, "Пауза между предложениями")
         menu.add(0, 8, 7, "Добавить закладку")
         menu.add(0, 9, 8, "Мои закладки")
+        menu.add(0, 10, 9, "Библиотека и история")
+        menu.add(0, 11, 10, "Размер текста")
+        menu.add(0, 12, 11, "Тема оформления")
         return true
     }
 
@@ -213,8 +221,61 @@ class MainActivity : AppCompatActivity() {
             7 -> sentencePauseDialog()
             8 -> saveBookmark()
             9 -> bookmarksDialog()
+            10 -> historyDialog()
+            11 -> fontSizeDialog()
+            12 -> themeDialog()
         }
         return true
+    }
+
+    private fun historyDialog() {
+        val a = Prefs.history(this)
+        if (a.length() == 0) {
+            toast("История пока пуста")
+            return
+        }
+        val labels = ArrayList<String>()
+        for (i in 0 until a.length()) labels.add(a.optJSONObject(i)?.optString("title", "Документ") ?: "Документ")
+        AlertDialog.Builder(this).setTitle("Библиотека и история")
+            .setItems(labels.toTypedArray()) { _, which ->
+                val item = a.optJSONObject(which) ?: return@setItems
+                val id = item.optString("id")
+                if (id.isNotEmpty()) openUri(Uri.parse(id))
+            }.setNegativeButton("Закрыть", null).show()
+    }
+
+    private fun fontSizeDialog() {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 24, 48, 0)
+        }
+        sliderRow(box, "Размер текста", 18, Prefs.fontSize(this) - 14,
+            { "${it + 14} sp" }) {
+            Prefs.setFontSize(this, it + 14)
+            adapter.notifyDataSetChanged()
+        }
+        AlertDialog.Builder(this).setTitle("Размер текста").setView(box)
+            .setPositiveButton("Готово", null).show()
+    }
+
+    private fun themeDialog() {
+        val labels = arrayOf("Как в системе", "Светлая", "Тёмная")
+        AlertDialog.Builder(this).setTitle("Тема оформления")
+            .setSingleChoiceItems(labels, Prefs.theme(this)) { dialog, which ->
+                Prefs.setTheme(this, which)
+                applySavedTheme()
+                dialog.dismiss()
+                recreate()
+            }.setNegativeButton("Отмена", null).show()
+    }
+
+    private fun applySavedTheme() {
+        val mode = when (Prefs.theme(this)) {
+            1 -> AppCompatDelegate.MODE_NIGHT_NO
+            2 -> AppCompatDelegate.MODE_NIGHT_YES
+            else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+        }
+        AppCompatDelegate.setDefaultNightMode(mode)
     }
 
     private fun saveBookmark() {
@@ -355,6 +416,7 @@ class MainActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(h: VH, pos: Int) {
             h.tv.text = Reader.sentences[pos]
+            h.tv.textSize = Prefs.fontSize(this).toFloat()
             h.tv.setBackgroundColor(if (pos == Reader.index) 0x66FFC107 else Color.TRANSPARENT)
             h.tv.setOnClickListener {
                 val p = h.bindingAdapterPosition
