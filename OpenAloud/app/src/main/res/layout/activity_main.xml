@@ -39,19 +39,19 @@
         android:background="#211D25"
         android:paddingVertical="6dp">
 
-        <Button android:id="@+id/prevCh" style="?android:attr/borderlessButtonStyle" android:textColor="#F0D7B0" android:backgroundTint="#51433B"
+        <Button android:id="@+id/prevCh" style="?android:attr/borderlessButtonStyle" android:textColor="#FFFFFF" android:backgroundTint="#51433B"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="− глава" android:textSize="12sp" />
-        <Button android:id="@+id/prev" style="?android:attr/borderlessButtonStyle"
+        <Button android:id="@+id/prev" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#51433B" android:textColor="#FFF1D8"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="‹" android:textSize="22sp" />
-        <Button android:id="@+id/play" style="?android:attr/borderlessButtonStyle"
+        <Button android:id="@+id/play" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#8A6744" android:textColor="#FFFFFF"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="▶" android:textSize="26sp" />
-        <Button android:id="@+id/next" style="?android:attr/borderlessButtonStyle"
+        <Button android:id="@+id/next" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#51433B" android:textColor="#FFF1D8"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="›" android:textSize="30sp" />
-        <Button android:id="@+id/nextCh" style="?android:attr/borderlessButtonStyle"
+        <Button android:id="@+id/nextCh" style="?android:attr/borderlessButtonStyle" android:backgroundTint="#51433B" android:textColor="#FFFFFF"
             android:layout_width="0dp" android:layout_height="wrap_content"
             android:layout_weight="1" android:text="+ глава" android:textSize="12sp" />
     </LinearLayout>
