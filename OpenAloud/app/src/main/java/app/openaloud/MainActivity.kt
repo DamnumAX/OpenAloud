@@ -255,6 +255,16 @@ class MainActivity : AppCompatActivity() {
         Reader.locale = d.locale
         Reader.index = Prefs.pos(this, d.id).coerceIn(0, d.sentences.size - 1)
         Reader.playing = false
+        val library = Prefs.library(this)
+        for (i in 0 until library.length()) {
+            val item = library.optJSONObject(i) ?: continue
+            val fileId = Uri.fromFile(File(item.optString("path"))).toString()
+            if (fileId == d.id || item.optString("path") == lastUri) {
+                item.put("total", d.sentences.size)
+                item.put("title", item.optString("title").ifBlank { d.title })
+            }
+        }
+        Prefs.saveLibrary(this, library)
         if (lastUri != null) {
             Prefs.setLastUri(this, lastUri)
             Prefs.addHistory(this, lastUri, d.title)
