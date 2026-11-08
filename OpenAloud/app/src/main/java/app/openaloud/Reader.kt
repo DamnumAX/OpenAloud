@@ -71,6 +71,13 @@ object Prefs {
     fun setFontSize(c: Context, v: Int) = sp(c).edit().putInt("font_size", v.coerceIn(14, 32)).apply()
     fun theme(c: Context) = sp(c).getInt("theme", 0)
     fun setTheme(c: Context, v: Int) = sp(c).edit().putInt("theme", v.coerceIn(0, 4)).apply()
+
+    fun library(c: Context) = org.json.JSONArray(sp(c).getString("library", "[]") ?: "[]")
+    fun folders(c: Context) = org.json.JSONArray(sp(c).getString("folders", "[]") ?: "[]")
+    fun saveLibrary(c: Context, a: org.json.JSONArray) = sp(c).edit().putString("library", a.toString()).apply()
+    fun saveFolders(c: Context, a: org.json.JSONArray) = sp(c).edit().putString("folders", a.toString()).apply()
+    fun autoNext(c: Context) = sp(c).getBoolean("auto_next_book", false)
+    fun setAutoNext(c: Context, v: Boolean) = sp(c).edit().putBoolean("auto_next_book", v).apply()
     fun removeBookmark(c: Context, index: Int) {
         val a = bookmarks(c)
         if (index in 0 until a.length()) {
