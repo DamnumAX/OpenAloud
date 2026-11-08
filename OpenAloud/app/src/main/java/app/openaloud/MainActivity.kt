@@ -49,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private var shownIndex = 0
     private var seeking = false
     private var voicePickerTts: TextToSpeech? = null
+    private var lastTapAt = 0L
+    private var lastTapPosition = RecyclerView.NO_POSITION
 
 
     private val importBook = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -118,7 +120,27 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         })
-        list.setOnTouchListener { _, event -> scaleDetector.onTouchEvent(event); false }
+        list.setOnTouchListener { rv, event ->
+            scaleDetector.onTouchEvent(event)
+            if (event.action == MotionEvent.ACTION_UP) {
+                val now = android.os.SystemClock.uptimeMillis()
+                val child = rv.findChildViewUnder(event.x, event.y)
+                val position = if (child == null) RecyclerView.NO_POSITION else rv.getChildAdapterPosition(child)
+                if (position != RecyclerView.NO_POSITION && position == lastTapPosition && now - lastTapAt in 1..350) {
+                    cmd(TtsService.SEEK_PLAY, position)
+                    lastTapAt = 0L
+                    true
+                } else {
+                    lastTapAt = now
+                    lastTapPosition = position
+                    if (position == RecyclerView.NO_POSITION) {
+                        if (event.x < rv.width * 0.3f) pageBy(-1)
+                        else if (event.x > rv.width * 0.7f) pageBy(1)
+                    }
+                    false
+                }
+            } else false
+        }
         applyReaderBackground()
         seek = findViewById(R.id.seek)
         playBtn = findViewById(R.id.play)
@@ -227,6 +249,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------- интерфейс ----------
+
+    private fun pageBy(direction: Int) {
+        val lm = list.layoutManager as LinearLayoutManager
+        val first = lm.findFirstVisibleItemPosition().coerceAtLeast(0)
+        val last = lm.findLastVisibleItemPosition().coerceAtLeast(first)
+        val page = (last - first + 1).coerceAtLeast(1)
+        lm.scrollToPosition((first + direction * page).coerceIn(0, (adapter.itemCount - 1).coerceAtLeast(0)))
+    }
 
     private fun applyReaderBackground() {
         val raw = getSharedPreferences("p", MODE_PRIVATE).getString("reader_bg_uri", null)
