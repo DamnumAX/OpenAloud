@@ -78,6 +78,8 @@ object Prefs {
     fun saveFolders(c: Context, a: org.json.JSONArray) = sp(c).edit().putString("folders", a.toString()).apply()
     fun autoNext(c: Context) = sp(c).getBoolean("auto_next_book", false)
     fun setAutoNext(c: Context, v: Boolean) = sp(c).edit().putBoolean("auto_next_book", v).apply()
+    fun sidePadding(c: Context) = sp(c).getInt("side_padding", 16).coerceIn(0, 96)
+    fun setSidePadding(c: Context, v: Int) = sp(c).edit().putInt("side_padding", v.coerceIn(0, 96)).apply()
     fun removeBookmark(c: Context, index: Int) {
         val a = bookmarks(c)
         if (index in 0 until a.length()) {
