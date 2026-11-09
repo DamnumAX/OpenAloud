@@ -299,9 +299,11 @@ class MainActivity : AppCompatActivity() {
         controlBar.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
         seek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
         browseSeek.visibility = if (expanded) ViewGroup.VISIBLE else ViewGroup.GONE
-        toolbar.title = if (expanded) Reader.title.ifEmpty { getString(R.string.app_name) } else ""
-        toolbar.subtitle = if (expanded) toolbarSubtitle() else ""
-        expandControls.text = if (expanded) "⌄" else "⌃"
+        toolbar.visibility = if (expanded) View.VISIBLE else View.GONE
+        topFrame.visibility = if (expanded) View.VISIBLE else View.GONE
+        toolbar.title = Reader.title.ifEmpty { getString(R.string.app_name) }
+        toolbar.subtitle = toolbarSubtitle()
+        expandControls.text = if (expanded) "⌄" else "⌃  •  ${remainingTimeLabel()}"
     }
 
     private fun readingModeDialog() {
@@ -408,7 +410,10 @@ class MainActivity : AppCompatActivity() {
             } else {
                 adapter.notifyItemChanged(shownIndex)
                 adapter.notifyItemChanged(Reader.index)
-                if (Reader.playing) lm.scrollToPositionWithOffset(Reader.index, 200)
+                if (Reader.playing) {
+                    list.stopScroll()
+                    lm.scrollToPositionWithOffset(Reader.index, (16 * resources.displayMetrics.density).roundToInt())
+                }
             }
         }
         shownIndex = Reader.index
@@ -418,6 +423,7 @@ class MainActivity : AppCompatActivity() {
         toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""
         miniProgress.max = 100
         miniProgress.progress = progressPercent
+        if (!controlsExpanded) expandControls.text = "⌃  •  ${remainingTimeLabel()}"
         browseSeek.max = max(1, Reader.sentences.size - 1)
         if (!browseSeek.isPressed) browseSeek.progress = Reader.index
         playBtn.text = if (Reader.playing) "⏸" else "▶"
@@ -427,24 +433,32 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun remainingTimeLabel(): String {
+        if (Reader.sentences.isEmpty()) return "нет текста"
+        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { it.length }
+        val cps = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
+        val seconds = (remainingChars / cps).roundToInt().coerceAtLeast(0)
+        val hours = seconds / 3600
+        val minutes = (seconds % 3600) / 60
+        return if (hours > 0) "осталось ${hours}ч ${minutes}м" else "осталось ${minutes}м"
+    }
+
     private fun toolbarSubtitle(): String {
         if (Reader.sentences.isEmpty()) return ""
-        val remainingChars = Reader.sentences.drop(Reader.index).sumOf { sentence -> sentence.length }
-        val charsPerSecond = (14.0 * Prefs.rate(this).coerceAtLeast(0.1f)).coerceAtLeast(1.0)
-        val minutesLeft = (remainingChars / charsPerSecond / 60.0).roundToInt()
         val percent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
-        return "$percent% прочитано • осталось примерно $minutesLeft мин."
+        return "$percent% прочитано • ${remainingTimeLabel()}"
     }
 
     private fun previewPosition(index: Int) {
         if (Reader.sentences.isEmpty()) return
         val target = index.coerceIn(0, Reader.sentences.lastIndex)
         val bookMode = getSharedPreferences("p", MODE_PRIVATE).getBoolean("reading_mode_book", false)
+        list.stopScroll()
         if (bookMode) {
             val page = bookPages.indexOfFirst { pageItems -> target in pageItems }.coerceAtLeast(0)
-            list.smoothScrollToPosition(page)
+            list.scrollToPosition(page)
         } else {
-            list.smoothScrollToPosition(target)
+            (list.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(target, 24)
         }
     }
 
@@ -508,6 +522,11 @@ class MainActivity : AppCompatActivity() {
         menu.add(0, 13, 12, "Автопереход к следующей книге")
         menu.add(0, 14, 13, "Выбрать голос")
         menu.add(0, 15, 14, "Поиск по тексту")
+        menu.add(0, 23, 0, "Поиск").apply {
+            setIcon(android.R.drawable.ic_menu_search)
+            setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
+        }
+        menu.add(0, 24, 22, "Настройки")
         menu.add(0, 16, 15, "Отступы текста")
         menu.add(0, 17, 16, "Установить свой фон")
         menu.add(0, 18, 17, "Убрать свой фон")
@@ -546,6 +565,8 @@ class MainActivity : AppCompatActivity() {
             20 -> readingModeDialog()
             21 -> createTextDialog()
             22 -> frameColorsDialog()
+            23 -> searchDialog()
+            24 -> settingsScreen()
         }
         return true
     }
@@ -832,6 +853,62 @@ class MainActivity : AppCompatActivity() {
             }
         }
         voicePickerTts = engine
+    }
+
+    private fun settingsScreen() {
+        val dialog = Dialog(this)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(20, 18, 20, 12) }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        header.addView(TextView(this).apply { text = "Настройки"; textSize = 23f; setPadding(4, 8, 4, 12) },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(Button(this).apply { text = "Готово"; setOnClickListener { dialog.dismiss() } })
+        root.addView(header)
+        val tabs = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val body = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(4, 12, 4, 4) }
+        root.addView(tabs)
+        val scroll = ScrollView(this); scroll.addView(body)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val pages = arrayOf("Чтение", "Оформление", "Озвучка")
+        fun addAction(label: String, action: () -> Unit) {
+            body.addView(Button(this).apply { text = label; isAllCaps = false; setOnClickListener { action() } },
+                LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
+        }
+        fun showPage(page: Int) {
+            body.removeAllViews()
+            when (page) {
+                0 -> {
+                    addAction("Размер текста") { fontSizeDialog() }
+                    addAction("Отступы и ширина текста") { textLayoutDialog() }
+                    addAction("Режим чтения: книга / свиток") { readingModeDialog() }
+                    addAction("Поиск по тексту") { searchDialog() }
+                    addAction("Автопереход к следующей книге") { autoNextDialog() }
+                }
+                1 -> {
+                    addAction("Тема оформления") { themeDialog() }
+                    addAction("Цвет верхней и нижней рамки") { frameColorsDialog() }
+                    addAction("Установить свой фон") { chooseBackground.launch(arrayOf("image/*")) }
+                    addAction("Убрать свой фон") { getSharedPreferences("p", MODE_PRIVATE).edit().remove("reader_bg_uri").apply(); applyReaderBackground() }
+                }
+                else -> {
+                    addAction("Скорость и тон") { speedDialog() }
+                    addAction("Выбрать голос") { voiceDialog() }
+                    addAction("Пауза между предложениями") { sentencePauseDialog() }
+                    addAction("Словарь замен") { dictDialog() }
+                    addAction("Таймер сна") { sleepDialog() }
+                    addAction("Голос и движок Android") {
+                        try { startActivity(Intent("com.android.settings.TTS_SETTINGS")) }
+                        catch (_: Exception) { startActivity(Intent(Settings.ACTION_SETTINGS)) }
+                    }
+                }
+            }
+        }
+        pages.forEachIndexed { index, label ->
+            tabs.addView(Button(this).apply { text = label; isAllCaps = false; setOnClickListener { showPage(index) } },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        showPage(0)
+        dialog.setContentView(root); dialog.show()
+        dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
     }
 
     private fun searchDialog() {
@@ -1135,7 +1212,10 @@ class MainActivity : AppCompatActivity() {
             if (activePart >= 0) {
                 val start = starts[activePart]
                 val end = start + parts[activePart].length
-                styled.setSpan(BackgroundColorSpan(0xCCFFC107.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                styled.setSpan(BackgroundColorSpan(0xFFFFC928.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            styled.setSpan(android.text.style.ForegroundColorSpan(0xFF241A0B.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            styled.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            styled.setSpan(android.text.style.UnderlineSpan(), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             h.tv.text = styled
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
