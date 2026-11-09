@@ -10,7 +10,7 @@
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="?attr/actionBarSize" />
+        android:layout_height="46dp" />
 
     <ProgressBar android:id="@+id/miniProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="3dp" android:max="100" android:progress="0" android:indeterminate="false" />
 
@@ -23,7 +23,7 @@
     <Button
         android:id="@+id/expandControls"
         android:layout_width="match_parent"
-        android:layout_height="32dp"
+        android:layout_height="38dp"
         android:background="#211D25"
         android:text="⌃"
         android:textColor="#F0D7B0"
