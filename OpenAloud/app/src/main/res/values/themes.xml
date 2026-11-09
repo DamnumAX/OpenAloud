@@ -29,6 +29,6 @@
         <item name="android:statusBarColor">#1B120D</item>
         <item name="android:navigationBarColor">#241A14</item>
     </style>
-    <style name="ReaderToolbarTitle" parent="TextAppearance.Material3.TitleMedium"><item name="android:textSize">7sp</item></style>
-    <style name="ReaderToolbarSubtitle" parent="TextAppearance.Material3.BodySmall"><item name="android:textSize">7sp</item></style>
+    <style name="ReaderToolbarTitle" parent="TextAppearance.Material3.TitleMedium"><item name="android:textSize">15sp</item></style>
+    <style name="ReaderToolbarSubtitle" parent="TextAppearance.Material3.BodySmall"><item name="android:textSize">11sp</item></style>
 </resources>
