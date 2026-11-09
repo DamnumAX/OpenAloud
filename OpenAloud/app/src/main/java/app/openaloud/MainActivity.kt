@@ -61,7 +61,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bottomFrame: View
     private lateinit var playBtn: Button
     private lateinit var controlBar: ViewGroup
-    private lateinit var expandControls: Button
+    private lateinit var expandControls: TextView
+    private lateinit var progressToggleFill: ProgressBar
     private val adapter = SentenceAdapter()
     private var shownDoc: String? = null
     private var shownIndex = 0
@@ -182,6 +183,7 @@ class MainActivity : AppCompatActivity() {
         playBtn = findViewById(R.id.play)
         controlBar = findViewById(R.id.controlBar)
         expandControls = findViewById(R.id.expandControls)
+        progressToggleFill = findViewById(R.id.progressToggleFill)
         expandControls.setOnClickListener { setControlsExpanded(!controlsExpanded) }
 
         playBtn.setOnClickListener {
@@ -303,7 +305,7 @@ class MainActivity : AppCompatActivity() {
         topFrame.visibility = if (expanded) View.VISIBLE else View.GONE
         toolbar.title = Reader.title.ifEmpty { getString(R.string.app_name) }
         toolbar.subtitle = toolbarSubtitle()
-        expandControls.text = if (expanded) "⌄" else "⌃  •  ${remainingTimeLabel()}"
+        expandControls.text = progressToggleLabel(expanded)
     }
 
     private fun readingModeDialog() {
@@ -423,7 +425,9 @@ class MainActivity : AppCompatActivity() {
         toolbar.subtitle = if (controlsExpanded) toolbarSubtitle() else ""
         miniProgress.max = 100
         miniProgress.progress = progressPercent
-        if (!controlsExpanded) expandControls.text = "⌃  •  ${remainingTimeLabel()}"
+        expandControls.text = progressToggleLabel(controlsExpanded)
+        progressToggleFill.max = 100
+        progressToggleFill.progress = progressPercent
         browseSeek.max = max(1, Reader.sentences.size - 1)
         if (!browseSeek.isPressed) browseSeek.progress = Reader.index
         playBtn.text = if (Reader.playing) "⏸" else "▶"
@@ -431,6 +435,12 @@ class MainActivity : AppCompatActivity() {
             seek.max = max(1, Reader.sentences.size - 1)
             seek.progress = Reader.index
         }
+    }
+
+    private fun progressToggleLabel(expanded: Boolean): String {
+        if (Reader.sentences.isEmpty()) return if (expanded) "⌄" else "⌃"
+        val percent = ((Reader.index.toDouble() / Reader.sentences.size.coerceAtLeast(1)) * 100).roundToInt()
+        return (if (expanded) "⌄" else "⌃") + "  $percent%  •  " + remainingTimeLabel()
     }
 
     private fun remainingTimeLabel(): String {
@@ -507,33 +517,18 @@ class MainActivity : AppCompatActivity() {
     private fun toast(s: String) = Toast.makeText(this, s, Toast.LENGTH_LONG).show()
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, "Открыть файл (TXT, EPUB, FB2, PDF, DOCX)")
-        menu.add(0, 2, 1, "Вставить из буфера / ссылку")
-        menu.add(0, 3, 2, "Скорость и тон")
-        menu.add(0, 4, 3, "Таймер сна")
-        menu.add(0, 5, 4, "Словарь замен")
-        menu.add(0, 6, 5, "Голос и движок (системные)")
-        menu.add(0, 7, 6, "Пауза между предложениями")
-        menu.add(0, 8, 7, "Добавить закладку")
-        menu.add(0, 9, 8, "Мои закладки")
-        menu.add(0, 10, 9, "Библиотека и история")
-        menu.add(0, 11, 10, "Размер текста")
-        menu.add(0, 12, 11, "Тема оформления")
-        menu.add(0, 13, 12, "Автопереход к следующей книге")
-        menu.add(0, 14, 13, "Выбрать голос")
-        menu.add(0, 15, 14, "Поиск по тексту")
         menu.add(0, 23, 0, "Поиск").apply {
             setIcon(android.R.drawable.ic_menu_search)
             setShowAsAction(MenuItem.SHOW_AS_ACTION_ALWAYS)
         }
-        menu.add(0, 24, 22, "Настройки")
-        menu.add(0, 16, 15, "Отступы текста")
-        menu.add(0, 17, 16, "Установить свой фон")
-        menu.add(0, 18, 17, "Убрать свой фон")
-        menu.add(0, 19, 18, "Ориентация экрана")
-        menu.add(0, 20, 19, "Режим чтения: книга / свиток")
-        menu.add(0, 21, 20, "Вставить / создать текст")
-        menu.add(0, 22, 21, "Цвет верхней и нижней рамки")
+        menu.add(0, 1, 1, "Открыть файл")
+        menu.add(0, 2, 2, "Вставить текст или ссылку")
+        menu.add(0, 10, 3, "Библиотека")
+        menu.add(0, 8, 4, "Добавить закладку")
+        menu.add(0, 9, 5, "Мои закладки")
+        menu.add(0, 21, 6, "Создать текст")
+        menu.add(0, 24, 7, "Настройки")
+        menu.add(0, 19, 8, "Ориентация экрана")
         return true
     }
 
@@ -1209,10 +1204,7 @@ class MainActivity : AppCompatActivity() {
             if (activePart >= 0) {
                 val start = starts[activePart]
                 val end = start + parts[activePart].length
-                styled.setSpan(BackgroundColorSpan(0xFFFFC928.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            styled.setSpan(android.text.style.ForegroundColorSpan(0xFF241A0B.toInt()), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            styled.setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-            styled.setSpan(android.text.style.UnderlineSpan(), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+                styled.setSpan(BackgroundColorSpan(0x66FFC928), start, end, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
             h.tv.text = styled
             h.tv.textSize = Prefs.fontSize(this@MainActivity).toFloat()
