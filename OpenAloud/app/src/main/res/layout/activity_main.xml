@@ -20,14 +20,36 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <Button
-        android:id="@+id/expandControls"
+    <FrameLayout
+        android:id="@+id/progressToggle"
         android:layout_width="match_parent"
-        android:layout_height="38dp"
-        android:background="#211D25"
-        android:text="⌃"
-        android:textColor="#F0D7B0"
-        android:textSize="20sp" />
+        android:layout_height="24dp"
+        android:background="#211D25">
+
+        <ProgressBar
+            android:id="@+id/progressToggleFill"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:max="100"
+            android:progress="0"
+            android:indeterminate="false"
+            android:progressTint="#8A6744"
+            android:progressBackgroundTint="#211D25" />
+
+        <TextView
+            android:id="@+id/expandControls"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true"
+            android:text="⌃"
+            android:textColor="#F0D7B0"
+            android:textSize="10sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+    </FrameLayout>
 
     <SeekBar
         android:id="@+id/seek"
