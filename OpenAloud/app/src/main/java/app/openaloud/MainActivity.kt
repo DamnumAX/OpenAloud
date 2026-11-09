@@ -576,104 +576,101 @@ class MainActivity : AppCompatActivity() {
         val dialog = Dialog(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(20, 16, 20, 12)
+            setPadding(18, 14, 18, 12)
+            setBackgroundColor(readerSurfaceColor())
         }
-        val title = TextView(this).apply {
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        header.addView(TextView(this).apply {
             text = "Моя библиотека"
-            textSize = 22f
-            setPadding(4, 8, 4, 16)
+            textSize = 24f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(Button(this).apply { text = "✕"; setOnClickListener { dialog.dismiss() } })
+        root.addView(header)
+        val search = EditText(this).apply {
+            hint = "Найти книгу или файл"
+            singleLine = true
+            setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0)
         }
-        root.addView(title)
+        root.addView(search, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         val scroll = ScrollView(this)
-        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, 8, 0, 8) }
         scroll.addView(rows)
-        val books = Prefs.library(this)
-        if (books.length() == 0) {
-            rows.addView(TextView(this).apply {
-                text = "Здесь пока нет книг. Нажми «Добавить книги», чтобы импортировать файлы."
-                textSize = 16f
-                setPadding(12, 24, 12, 24)
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+
+        fun card(title: String, subtitle: String, icon: String, onOpen: () -> Unit, onMore: (() -> Unit)? = null) {
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setPadding(14, 12, 8, 12)
+                background = android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 16f * resources.displayMetrics.density
+                    setColor(if (AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES) 0xFF39302B.toInt() else 0xFFF0ECE7.toInt())
+                }
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onOpen() }
+            }
+            box.addView(TextView(this).apply { text = icon; textSize = 26f; setPadding(0, 0, 12, 0) })
+            val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            labels.addView(TextView(this).apply { text = title; textSize = 16f; maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END; setTypeface(null, android.graphics.Typeface.BOLD) })
+            labels.addView(TextView(this).apply { text = subtitle; textSize = 12f; alpha = 0.72f; setPadding(0, 3, 0, 0) })
+            box.addView(labels, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            if (onMore != null) box.addView(Button(this).apply { text = "⋮"; minWidth = 42; setOnClickListener { onMore() } })
+            rows.addView(box, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 8 })
+        }
+        fun render(filter: String = "") {
+            rows.removeAllViews()
+            val books = Prefs.library(this)
+            val folders = Prefs.folders(this)
+            var count = 0
+            for (i in 0 until folders.length()) {
+                val folder = folders.optString(i)
+                val matching = (0 until books.length()).count { idx ->
+                    val b = books.optJSONObject(idx) ?: return@count false
+                    b.optString("folder") == folder && b.optString("title").contains(filter, true)
+                }
+                if (filter.isEmpty() || folder.contains(filter, true) || matching > 0) {
+                    card(folder, "$matching файлов", "📁", { dialog.dismiss(); showLibraryBooks(folder) }) {
+                        AlertDialog.Builder(this).setTitle(folder).setItems(arrayOf("Открыть папку", "Переименовать или удалить")) { _, action ->
+                            if (action == 0) { dialog.dismiss(); showLibraryBooks(folder) } else { dialog.dismiss(); foldersDialog() }
+                        }.show()
+                    }
+                    count++
+                }
+            }
+            for (i in 0 until books.length()) {
+                val book = books.optJSONObject(i) ?: continue
+                val title = book.optString("title", "Книга")
+                if (filter.isNotEmpty() && !title.contains(filter, true)) continue
+                val path = book.optString("path")
+                val id = Uri.fromFile(File(path)).toString()
+                val total = if (id == Reader.docId) Reader.sentences.size else book.optInt("total", 0)
+                val position = if (id == Reader.docId) Reader.index else Prefs.pos(this, id)
+                val percent = if (total > 0) (position * 100 / total).coerceIn(0, 100) else 0
+                val folder = book.optString("folder").ifBlank { "Без папки" }
+                card(title, "$folder  •  ${if (total > 0) "$percent% прочитано" else "Не открывалась"}", "📖", {
+                    val file = File(path)
+                    if (file.exists()) { dialog.dismiss(); openUri(Uri.fromFile(file)) } else toast("Файл не найден")
+                }) { booksDialog(listOf(book)) }
+                count++
+            }
+            if (count == 0) rows.addView(TextView(this).apply {
+                text = if (filter.isEmpty()) "Библиотека пока пуста. Добавьте книгу или создайте текст." else "Ничего не найдено."
+                textSize = 16f; setPadding(18, 32, 18, 32)
             })
         }
-        for (i in 0 until books.length()) {
-            val book = books.optJSONObject(i) ?: continue
-            val id = Uri.fromFile(File(book.optString("path"))).toString()
-            val progress = Prefs.pos(this, id)
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(12, 12, 12, 12)
-                setBackgroundResource(android.R.drawable.list_selector_background)
-                isClickable = true
-                isFocusable = true
-            }
-            val name = TextView(this).apply {
-                text = book.optString("title", "Книга")
-                textSize = 17f
-                maxLines = 2
-            }
-            val total = if (id == Reader.docId) Reader.sentences.size else book.optInt("total", 0)
-            val percent = if (total > 0) ((progress.toDouble() / total) * 100).toInt().coerceIn(0, 100) else 0
-            val detail = TextView(this).apply {
-                text = if (total > 0) "$percent% прочитано" else "Ещё не открывалась"
-                textSize = 12f
-                setPadding(0, 4, 0, 4)
-            }
-            val bar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
-                max = 100
-                this.progress = percent
-            }
-            row.addView(name)
-            row.addView(detail)
-            row.addView(bar, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 8))
-            row.setOnClickListener {
-                val file = File(book.optString("path"))
-                if (file.exists()) { dialog.dismiss(); openUri(Uri.fromFile(file)) }
-                else toast("Файл не найден")
-            }
-            row.setOnLongClickListener {
-                val one = listOf(book)
-                dialog.dismiss()
-                booksDialog(one)
-                true
-            }
-            rows.addView(row)
-            val divider = View(this).apply { setBackgroundColor(0x33222222) }
-            rows.addView(divider, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 1))
-        }
-        val folders = Prefs.folders(this)
-        for (i in 0 until folders.length()) {
-            val folderName = folders.optString(i)
-            val count = (0 until books.length()).count { books.optJSONObject(it)?.optString("folder") == folderName }
-            val folderRow = TextView(this).apply {
-                text = "📁  $folderName  ·  $count"
-                textSize = 16f
-                setPadding(16, 14, 16, 14)
-                setBackgroundResource(android.R.drawable.list_selector_background)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener { dialog.dismiss(); showLibraryBooks(folderName) }
-            }
-            rows.addView(folderRow)
-        }
-        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        val buttons = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.END
-        }
-        val add = Button(this).apply {
-            text = "Добавить книги"
-            setOnClickListener { dialog.dismiss(); importBook.launch(arrayOf("*/*")) }
-        }
-        val foldersButton = Button(this).apply {
-            text = "Папки"
-            setOnClickListener { dialog.dismiss(); foldersDialog() }
-        }
-        val close = Button(this).apply {
-            text = "Закрыть"
-            setOnClickListener { dialog.dismiss() }
-        }
-        buttons.addView(add); buttons.addView(foldersButton); buttons.addView(close)
-        root.addView(buttons)
+        render()
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { render(s?.toString().orEmpty()) }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        actions.addView(Button(this).apply { text = "＋ Файл"; isAllCaps = false; setOnClickListener { dialog.dismiss(); importBook.launch(arrayOf("*/*")) } }, LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(Button(this).apply { text = "＋ Текст"; isAllCaps = false; setOnClickListener { dialog.dismiss(); createTextDialog() } }, LinearLayout.LayoutParams(0, -2, 1f))
+        actions.addView(Button(this).apply { text = "Папки"; isAllCaps = false; setOnClickListener { dialog.dismiss(); foldersDialog() } }, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(actions)
         dialog.setContentView(root)
         dialog.show()
         dialog.window?.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
