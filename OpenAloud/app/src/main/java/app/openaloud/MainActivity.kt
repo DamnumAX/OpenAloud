@@ -589,7 +589,7 @@ class MainActivity : AppCompatActivity() {
         root.addView(header)
         val search = EditText(this).apply {
             hint = "Найти книгу или файл"
-            singleLine = true
+            isSingleLine = true
             setCompoundDrawablesWithIntrinsicBounds(android.R.drawable.ic_menu_search, 0, 0, 0)
         }
         root.addView(search, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
